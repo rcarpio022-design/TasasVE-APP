@@ -126,7 +126,7 @@ public class MainActivity extends Activity {
         "<header class=\"topbar\"><div class=\"topbar-in\"><div class=\"top\"><div><h1>Tasas VE</h1><p class=\"note\" id=\"stamp\">Cargando tasas…</p></div>" +
         "<div class=\"acts\"><button class=\"icon-btn\" id=\"theme\" type=\"button\" aria-label=\"Cambiar tema\">☀️</button>" +
         "<button class=\"icon-btn primary\" id=\"refresh\" type=\"button\" aria-label=\"Actualizar\"><span id=\"ref-ic\">↻</span></button></div></div>" +
-        "<nav class=\"navchips\"><button class=\"alert-chip\" id=\"alert-btn\" type=\"button\">🔔 Alertas</button><a href=\"#sec-tasas\">Tasas</a><a href=\"#sec-brecha\">Brecha</a><a href=\"#sec-conv\">Convertidor</a><a href=\"#sec-calc\">Calculadora</a><a href=\"#sec-mundo\">Mundo</a></nav></div></header>" +
+        "<nav class=\"navchips\"><button class=\"alert-chip\" id=\"alert-btn\" type=\"button\">🔔 Alertas BCV</button><a href=\"#sec-tasas\">Tasas</a><a href=\"#sec-brecha\">Brecha</a><a href=\"#sec-conv\">Convertidor</a><a href=\"#sec-calc\">Calculadora</a><a href=\"#sec-mundo\">Mundo</a></nav></div></header>" +
         "<main><div class=\"grid\" id=\"sec-tasas\">" +
         "<section class=\"tile c-bcv copyable\" id=\"t-usd\"></section>" +
         "<section class=\"tile c-eur copyable\" id=\"t-eur\"></section>" +
@@ -187,21 +187,20 @@ public class MainActivity extends Activity {
         "function checkNotify(label,curVal,prevVal,hadPrev){if(!alertsEnabled||!hadPrev||curVal==null||prevVal==null)return;var diff=curVal-prevVal;if(Math.abs(diff)<0.005)return;var dir=diff>0?\"subió\":\"bajó\";var title=label+\" \"+dir+\" a Bs \"+nf(curVal);var body=(diff>0?\"+\":\"-\")+\"Bs \"+nf(Math.abs(diff))+\" (antes Bs \"+nf(prevVal)+\")\";if(window.AndroidBridge&&window.AndroidBridge.sendAlert){window.AndroidBridge.sendAlert(title,body)}}" +
         "function addLog(src,val,prev,at,nodup){if(val==null)return;var last=log.filter(function(x){return x.src===src})[0];if(last&&last.val===val&&(nodup||+last.at===+at))return;log.unshift({at:at,src:src,val:val,delta:val-(prev==null?val:prev)})}" +
         "function applyPayload(j,off){var up=dt(j.updated,new Date()),bu=j.bcv&&j.bcv.usd,be=j.bcv&&j.bcv.eur,pa=j.paralelo;if(!bu||!bu.value||!be||!be.value||!pa||!pa.value)throw new Error(\"faltan tasas\");var bd=dt(bu.at,up);" +
-        "var prevUsdSaved=null,prevEurSaved=null,prevParSaved=null,prevUsdtSaved=null;" +
-        "try{var rU=JSON.parse(localStorage.getItem(\"tv_usd\")||\"{}\");if(rU.last!==undefined)prevUsdSaved=rU.last;var rE=JSON.parse(localStorage.getItem(\"tv_eur\")||\"{}\");if(rE.last!==undefined)prevEurSaved=rE.last;var rP=JSON.parse(localStorage.getItem(\"tv_par\")||\"{}\");if(rP.last!==undefined)prevParSaved=rP.last;}catch(e){}" +
+        "var prevUsdSaved=null;" +
+        "try{var rU=JSON.parse(localStorage.getItem(\"tv_usd\")||\"{}\");if(rU.last!==undefined)prevUsdSaved=rU.last;}catch(e){}" +
         "var nd={bcv:{usd:bu.value,eur:be.value,prevUsd:track(\"usd\",bu.value),prevEur:track(\"eur\",be.value),at:up},paralelo:{usd:pa.value,prevUsd:track(\"par\",pa.value),at:dt(pa.at,up)},binance:{buy:j.binance?j.binance.buy:null,sell:j.binance?j.binance.sell:null,at:up},okx:{buy:j.okx?j.okx.buy:null,sell:j.okx?j.okx.sell:null,at:up},world:data.world.map(function(w){var r=j.world&&j.world.rates&&j.world.rates[w.code];return{code:w.code,name:w.name,country:w.country,perUsd:r||w.perUsd}})};" +
         "if(live||hasCached){[\"binance\",\"okx\"].forEach(function(k){if(avg(nd[k])===null&&avg(data[k])!==null)nd[k]=data[k]})}nd.binance.prevAvg=track(\"bin\",avg(nd.binance));nd.okx.prevAvg=track(\"okx\",avg(nd.okx));" +
         "var curUsdt=(function(){var v=[avg(nd.binance),avg(nd.okx)].filter(function(x){return x!==null});return v.length?v.reduce(function(a,c){return a+c},0)/v.length:null})();" +
-        "try{var rW=localStorage.getItem(\"tv_usdt_last\");if(rW!==null&&rW!==\"\")prevUsdtSaved=parseFloat(rW);if(curUsdt!=null)localStorage.setItem(\"tv_usdt_last\",String(curUsdt))}catch(e){}" +
-        "if(!off){checkNotify(\"Dólar BCV\",nd.bcv.usd,prevUsdSaved,prevUsdSaved!==null);checkNotify(\"Euro BCV\",nd.bcv.eur,prevEurSaved,prevEurSaved!==null);checkNotify(\"Dólar paralelo\",nd.paralelo.usd,prevParSaved,prevParSaved!==null);checkNotify(\"USDT\",curUsdt,prevUsdtSaved,prevUsdtSaved!==null)}" +
+        "if(!off){checkNotify(\"Dólar BCV\",nd.bcv.usd,prevUsdSaved,prevUsdSaved!==null)}" +
         "var ds=bd.toLocaleDateString(\"es-VE\",{day:\"2-digit\",month:\"2-digit\"});addLog(\"Dólar BCV (\"+ds+\")\",nd.bcv.usd,nd.bcv.prevUsd,up,true);addLog(\"Euro BCV (\"+ds+\")\",nd.bcv.eur,nd.bcv.prevEur,up,true);addLog(\"Dólar paralelo\",nd.paralelo.usd,nd.paralelo.prevUsd,nd.paralelo.at,true);addLog(\"USDT OKX\",avg(nd.okx),nd.okx.prevAvg,nd.okx.at,false);addLog(\"USDT Binance\",avg(nd.binance),nd.binance.prevAvg,nd.binance.at,false);log.length=Math.min(log.length,20);" +
         "if(window.AndroidBridge&&window.AndroidBridge.syncWidget){var bA=avg(nd.binance),oA=avg(nd.okx);window.AndroidBridge.syncWidget(nd.bcv.usd||0,nd.bcv.eur||0,nd.paralelo.usd||0,curUsdt||0,bA||0,oA||0)}" +
         "data=nd;build(off)}" +
         "function loadCache(){try{var raw=localStorage.getItem(\"tv_cached_api\");if(!raw)return false;applyPayload(JSON.parse(raw),true);hasCached=true;return true}catch(e){return false}}" +
         "function loadReal(){var b=$(\"refresh\"),ic=$(\"ref-ic\");b.disabled=true;ic.classList.add(\"spin\");return fetch(API_URL).then(function(r){if(!r.ok)throw new Error(\"HTTP \"+r.status);return r.json()}).then(function(j){try{localStorage.setItem(\"tv_cached_api\",JSON.stringify(j))}catch(e){}applyPayload(j,false);live=true;hasCached=true}).catch(function(){if(live||hasCached){renderRates(true)}else{$(\"stamp\").textContent=\"Sin conexión. Conéctate una vez para descargar las tasas.\"}}).then(function(){b.disabled=false;ic.classList.remove(\"spin\")})}" +
         "function updateThemeIcon(){var r=document.documentElement,c=r.dataset.theme||(matchMedia(\"(prefers-color-scheme: dark)\").matches?\"dark\":\"light\");$(\"theme\").textContent=c===\"dark\"?\"☀️\":\"🌙\"}" +
-        "function updateAlertBtn(){var b=$(\"alert-btn\");b.className=\"alert-chip\"+(alertsEnabled?\" on\":\"\");b.textContent=alertsEnabled?\"🔔 Alertas ON\":\"🔕 Alertas OFF\"}" +
-        "$(\"alert-btn\").addEventListener(\"click\",function(){if(!alertsEnabled&&window.AndroidBridge&&window.AndroidBridge.requestNotifPermission){window.AndroidBridge.requestNotifPermission()}alertsEnabled=!alertsEnabled;try{localStorage.setItem(\"tv_alerts\",alertsEnabled?\"1\":\"0\")}catch(e){}updateAlertBtn();showToast(alertsEnabled?\"Alertas de cambio activadas\":\"Alertas desactivadas\")});" +
+        "function updateAlertBtn(){var b=$(\"alert-btn\");b.className=\"alert-chip\"+(alertsEnabled?\" on\":\"\");b.textContent=alertsEnabled?\"🔔 BCV ON\":\"🔕 BCV OFF\"}" +
+        "$(\"alert-btn\").addEventListener(\"click\",function(){if(!alertsEnabled&&window.AndroidBridge&&window.AndroidBridge.requestNotifPermission){window.AndroidBridge.requestNotifPermission()}alertsEnabled=!alertsEnabled;try{localStorage.setItem(\"tv_alerts\",alertsEnabled?\"1\":\"0\")}catch(e){}updateAlertBtn();showToast(alertsEnabled?\"Alertas del BCV activadas\":\"Alertas desactivadas\")});" +
         "$(\"amt\").addEventListener(\"input\",convert);$(\"from\").addEventListener(\"change\",convert);$(\"to\").addEventListener(\"change\",convert);$(\"q\").addEventListener(\"input\",renderWorld);" +
         "$(\"swap\").addEventListener(\"click\",function(){var a=$(\"from\").value;$(\"from\").value=$(\"to\").value;$(\"to\").value=a;convert()});" +
         "$(\"result\").addEventListener(\"click\",function(){if(!lastConvVal)return;if(navigator.clipboard)navigator.clipboard.writeText(lastConvVal).catch(function(){});showToast(\"Copiado: \"+lastConvVal)});" +
@@ -295,7 +294,7 @@ public class MainActivity extends Activity {
                 "Cambios en Tasas VE",
                 NotificationManager.IMPORTANCE_DEFAULT
             );
-            ch.setDescription("Avisos cuando sube o baja el BCV, Paralelo o USDT");
+            ch.setDescription("Avisos cuando sube o baja el Dólar BCV");
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             if (nm != null) nm.createNotificationChannel(ch);
         }
