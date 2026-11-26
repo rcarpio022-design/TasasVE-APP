@@ -173,7 +173,9 @@ public class MainActivity extends Activity {
         "var curUsdt=(function(){var v=[avg(nd.binance),avg(nd.okx)].filter(function(x){return x!==null});return v.length?v.reduce(function(a,c){return a+c},0)/v.length:null})();" +
         "try{var rW=localStorage.getItem(\"tv_usdt_last\");if(rW!==null&&rW!==\"\")prevUsdtSaved=parseFloat(rW);if(curUsdt!=null)localStorage.setItem(\"tv_usdt_last\",String(curUsdt))}catch(e){}" +
         "if(!off){checkNotify(\"Dólar BCV\",nd.bcv.usd,prevUsdSaved,prevUsdSaved!==null);checkNotify(\"Euro BCV\",nd.bcv.eur,prevEurSaved,prevEurSaved!==null);checkNotify(\"Dólar paralelo\",nd.paralelo.usd,prevParSaved,prevParSaved!==null);checkNotify(\"USDT\",curUsdt,prevUsdtSaved,prevUsdtSaved!==null)}" +
-        "var ds=bd.toLocaleDateString(\"es-VE\",{day:\"2-digit\",month:\"2-digit\"});addLog(\"Dólar BCV (\"+ds+\")\",nd.bcv.usd,nd.bcv.prevUsd,up,true);addLog(\"Euro BCV (\"+ds+\")\",nd.bcv.eur,nd.bcv.prevEur,up,true);addLog(\"Dólar paralelo\",nd.paralelo.usd,nd.paralelo.prevUsd,nd.paralelo.at,true);addLog(\"USDT OKX\",avg(nd.okx),nd.okx.prevAvg,nd.okx.at,false);addLog(\"USDT Binance\",avg(nd.binance),nd.binance.prevAvg,nd.binance.at,false);log.length=Math.min(log.length,20);data=nd;build(off)}" +
+        "var ds=bd.toLocaleDateString(\"es-VE\",{day:\"2-digit\",month:\"2-digit\"});addLog(\"Dólar BCV (\"+ds+\")\",nd.bcv.usd,nd.bcv.prevUsd,up,true);addLog(\"Euro BCV (\"+ds+\")\",nd.bcv.eur,nd.bcv.prevEur,up,true);addLog(\"Dólar paralelo\",nd.paralelo.usd,nd.paralelo.prevUsd,nd.paralelo.at,true);addLog(\"USDT OKX\",avg(nd.okx),nd.okx.prevAvg,nd.okx.at,false);addLog(\"USDT Binance\",avg(nd.binance),nd.binance.prevAvg,nd.binance.at,false);log.length=Math.min(log.length,20);" +
+        "if(window.AndroidBridge&&window.AndroidBridge.syncWidget){window.AndroidBridge.syncWidget(nd.bcv.usd||0,nd.paralelo.usd||0,curUsdt||0)}" +
+        "data=nd;build(off)}" +
         "function loadCache(){try{var raw=localStorage.getItem(\"tv_cached_api\");if(!raw)return false;applyPayload(JSON.parse(raw),true);hasCached=true;return true}catch(e){return false}}" +
         "function loadReal(){var b=$(\"refresh\"),ic=$(\"ref-ic\");b.disabled=true;ic.classList.add(\"spin\");return fetch(API_URL).then(function(r){if(!r.ok)throw new Error(\"HTTP \"+r.status);return r.json()}).then(function(j){try{localStorage.setItem(\"tv_cached_api\",JSON.stringify(j))}catch(e){}applyPayload(j,false);live=true;hasCached=true}).catch(function(){if(live||hasCached){renderRates(true)}else{$(\"stamp\").textContent=\"Sin conexión. Conéctate una vez para descargar las tasas.\"}}).then(function(){b.disabled=false;ic.classList.remove(\"spin\")})}" +
         "function updateThemeIcon(){var r=document.documentElement,c=r.dataset.theme||(matchMedia(\"(prefers-color-scheme: dark)\").matches?\"dark\":\"light\");$(\"theme\").textContent=c===\"dark\"?\"☀️\":\"🌙\"}" +
@@ -280,6 +282,14 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void sendAlert(String title, String body) {
             runOnUiThread(() -> showRateNotification(title, body));
+        }
+
+        @JavascriptInterface
+        public void syncWidget(double bcvUsd, double parUsd, double usdtAvg) {
+            runOnUiThread(() -> {
+                Double u = (usdtAvg > 0) ? usdtAvg : null;
+                TasasWidgetProvider.saveFromApp(MainActivity.this, bcvUsd, parUsd, u);
+            });
         }
     }
 
