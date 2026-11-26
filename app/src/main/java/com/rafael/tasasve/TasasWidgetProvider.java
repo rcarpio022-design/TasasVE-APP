@@ -8,12 +8,15 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.widget.RemoteViews;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -26,7 +29,8 @@ import javax.net.ssl.HttpsURLConnection;
 
 public class TasasWidgetProvider extends AppWidgetProvider {
     private static final String ACTION_REFRESH = "com.rafael.tasasve.ACTION_WIDGET_REFRESH";
-    private static final String API_URL = "https://tasas-ve-api.rafael-f60.workers.dev/api";
+    private static final String HOST = "tasas-ve-api.rafael-f60.workers.dev";
+    private static final String API_URL = "https://" + HOST + "/api";
     private static final String PREFS = "tasas_widget_cache";
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
 
@@ -67,6 +71,14 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         );
         views.setOnClickPendingIntent(R.id.w_root, openPi);
 
+        Intent cfgIntent = new Intent(context, MainActivity.class);
+        cfgIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent cfgPi = PendingIntent.getActivity(
+            context, id + 2000, cfgIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        views.setOnClickPendingIntent(R.id.w_cfg, cfgPi);
+
         Intent refIntent = new Intent(context, TasasWidgetProvider.class);
         refIntent.setAction(ACTION_REFRESH);
         refIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
@@ -97,46 +109,75 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         mgr.updateAppWidget(id, views);
     }
 
-    private String fetchJsonOnce() throws Exception {
+    private String readStream(InputStream stream) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        if (stream != null) {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(stream, "UTF-8"))) {
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line);
+            }
+        }
+        return sb.toString();
+    }
+
+    private String resolveIpViaDoh() throws Exception {
+        HttpsURLConnection doh = null;
+        try {
+            URL u = new URL("https://1.1.1.1/dns-query?name=" + HOST + "&type=A");
+            doh = (HttpsURLConnection) u.openConnection();
+            doh.setConnectTimeout(10000);
+            doh.setReadTimeout(10000);
+            doh.setRequestProperty("Accept", "application/dns-json");
+            if (doh.getResponseCode() != 200) throw new Exception("DoH HTTP " + doh.getResponseCode());
+            JSONObject ans = new JSONObject(readStream(doh.getInputStream()));
+            JSONArray arr = ans.optJSONArray("Answer");
+            if (arr != null) {
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject item = arr.optJSONObject(i);
+                    if (item != null && item.optInt("type") == 1 && item.has("data")) {
+                        return item.getString("data");
+                    }
+                }
+            }
+            throw new Exception("Sin IP DoH");
+        } finally {
+            if (doh != null) doh.disconnect();
+        }
+    }
+
+    private String fetchJsonDirect(String targetUrl, String hostHeader) throws Exception {
         HttpsURLConnection conn = null;
         try {
-            URL url = new URL(API_URL);
+            URL url = new URL(targetUrl);
             conn = (HttpsURLConnection) url.openConnection();
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
             conn.setRequestMethod("GET");
+            if (hostHeader != null) {
+                conn.setRequestProperty("Host", hostHeader);
+            }
             conn.setRequestProperty("User-Agent", "TasasVE-Android/1.0");
             conn.setRequestProperty("Accept", "application/json");
 
             int code = conn.getResponseCode();
             InputStream stream = (code >= 200 && code < 300) ? conn.getInputStream() : conn.getErrorStream();
-            StringBuilder sb = new StringBuilder();
-            if (stream != null) {
-                try (BufferedReader br = new BufferedReader(new InputStreamReader(stream, "UTF-8"))) {
-                    String line;
-                    while ((line = br.readLine()) != null) sb.append(line);
-                }
-            }
-
+            String body = readStream(stream);
             if (code < 200 || code >= 300) {
                 throw new Exception("HTTP " + code);
             }
-            return sb.toString();
+            return body;
         } finally {
             if (conn != null) conn.disconnect();
         }
     }
 
-    private String fetchJsonWithRetry() throws Exception {
+    private String fetchJsonSmart() throws Exception {
         try {
-            return fetchJsonOnce();
-        } catch (Exception firstError) {
-            try {
-                Thread.sleep(1500);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-            }
-            return fetchJsonOnce();
+            InetAddress.getByName(HOST);
+            return fetchJsonDirect(API_URL, null);
+        } catch (UnknownHostException uhe) {
+            String ip = resolveIpViaDoh();
+            return fetchJsonDirect("https://" + ip + "/api", HOST);
         }
     }
 
@@ -144,7 +185,7 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         IO.execute(() -> {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
             try {
-                String rawJson = fetchJsonWithRetry();
+                String rawJson = fetchJsonSmart();
                 JSONObject root = new JSONObject(rawJson);
 
                 Double bcvUsd = extractNumber(root.optJSONObject("bcv"), "usd");
