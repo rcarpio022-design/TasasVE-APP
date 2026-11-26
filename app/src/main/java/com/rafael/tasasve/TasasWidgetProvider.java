@@ -5,13 +5,14 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.widget.RemoteViews;
 
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -21,15 +22,19 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.net.ssl.HttpsURLConnection;
+
 public class TasasWidgetProvider extends AppWidgetProvider {
     private static final String ACTION_REFRESH = "com.rafael.tasasve.ACTION_WIDGET_REFRESH";
     private static final String API_URL = "https://tasas-ve-api.rafael-f60.workers.dev/api";
+    private static final String PREFS = "tasas_widget_cache";
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
 
     @Override
     public void onUpdate(Context context, AppWidgetManager mgr, int[] appWidgetIds) {
         for (int id : appWidgetIds) {
-            bindActionsAndLoading(context, mgr, id);
+            bindActions(context, mgr, id);
+            renderCachedIfAny(context, mgr, id, "Actualizando…");
             fetchAndRender(context, mgr, id);
         }
     }
@@ -44,17 +49,18 @@ public class TasasWidgetProvider extends AppWidgetProvider {
             );
             AppWidgetManager mgr = AppWidgetManager.getInstance(context);
             if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                bindActionsAndLoading(context, mgr, id);
+                bindActions(context, mgr, id);
+                renderCachedIfAny(context, mgr, id, "Actualizando…");
                 fetchAndRender(context, mgr, id);
             }
         }
     }
 
-    private void bindActionsAndLoading(Context context, AppWidgetManager mgr, int id) {
+    private void bindActions(Context context, AppWidgetManager mgr, int id) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
-        views.setTextViewText(R.id.w_time, "Actualizando…");
 
         Intent openIntent = new Intent(context, MainActivity.class);
+        openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent openPi = PendingIntent.getActivity(
             context, id, openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
@@ -73,27 +79,50 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         mgr.updateAppWidget(id, views);
     }
 
+    private void renderCachedIfAny(Context context, AppWidgetManager mgr, int id, String statusText) {
+        SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String bcv = sp.getString("bcv", null);
+        String par = sp.getString("par", null);
+        String lastTime = sp.getString("time", null);
+
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
+        if (bcv != null && par != null) {
+            views.setTextViewText(R.id.w_bcv, bcv);
+            views.setTextViewText(R.id.w_par, par);
+            views.setTextViewText(R.id.w_time, statusText + (lastTime != null ? " (" + lastTime + ")" : ""));
+        } else {
+            views.setTextViewText(R.id.w_time, statusText);
+        }
+        bindActions(context, mgr, id);
+        mgr.updateAppWidget(id, views);
+    }
+
     private void fetchAndRender(Context context, AppWidgetManager mgr, int id) {
         IO.execute(() -> {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
+            HttpsURLConnection conn = null;
             try {
-                HttpURLConnection conn = (HttpURLConnection) new URL(API_URL).openConnection();
+                URL url = new URL(API_URL);
+                conn = (HttpsURLConnection) url.openConnection();
                 conn.setConnectTimeout(15000);
                 conn.setReadTimeout(15000);
                 conn.setRequestMethod("GET");
+                conn.setRequestProperty("User-Agent", "TasasVE-Android/1.0");
                 conn.setRequestProperty("Accept", "application/json");
 
                 int code = conn.getResponseCode();
+                InputStream stream = (code >= 200 && code < 300) ? conn.getInputStream() : conn.getErrorStream();
+                StringBuilder sb = new StringBuilder();
+                if (stream != null) {
+                    try (BufferedReader br = new BufferedReader(new InputStreamReader(stream, "UTF-8"))) {
+                        String line;
+                        while ((line = br.readLine()) != null) sb.append(line);
+                    }
+                }
+
                 if (code < 200 || code >= 300) {
                     throw new Exception("HTTP " + code);
                 }
-
-                StringBuilder sb = new StringBuilder();
-                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
-                    String line;
-                    while ((line = br.readLine()) != null) sb.append(line);
-                }
-                conn.disconnect();
 
                 JSONObject root = new JSONObject(sb.toString());
                 Double bcvUsd = extractNumber(root.optJSONObject("bcv"), "usd");
@@ -103,27 +132,61 @@ public class TasasWidgetProvider extends AppWidgetProvider {
                 for (String k : new String[]{"binance", "okx"}) {
                     JSONObject ex = root.optJSONObject(k);
                     if (ex != null) {
-                        if (ex.has("buy") && !ex.isNull("buy")) p2p.add(ex.getDouble("buy"));
-                        if (ex.has("sell") && !ex.isNull("sell")) p2p.add(ex.getDouble("sell"));
+                        Double buy = extractNumber(ex, "buy");
+                        Double sell = extractNumber(ex, "sell");
+                        if (buy != null && !Double.isNaN(buy)) p2p.add(buy);
+                        if (sell != null && !Double.isNaN(sell)) p2p.add(sell);
                     }
                 }
 
-                String bcvStr = (bcvUsd != null) ? "Bs " + fmt(bcvUsd) : "Bs —";
-                String parStr = (parUsd != null) ? "Bs " + fmt(parUsd) : "Bs —";
-                String usdtStr = "Bs —";
+                String bcvLine = "BCV: " + ((bcvUsd != null && !Double.isNaN(bcvUsd)) ? "Bs " + fmt(bcvUsd) : "Bs —");
+                String parVal = (parUsd != null && !Double.isNaN(parUsd)) ? "Bs " + fmt(parUsd) : "Bs —";
+                String usdtVal = "Bs —";
                 if (!p2p.isEmpty()) {
                     double sum = 0;
                     for (double v : p2p) sum += v;
-                    usdtStr = "Bs " + fmt(sum / p2p.size());
+                    usdtVal = "Bs " + fmt(sum / p2p.size());
+                }
+                String parLine = "Par: " + parVal + " · USDT: " + usdtVal;
+                String hora = new SimpleDateFormat("hh:mm a", new Locale("es", "VE")).format(new Date());
+                String timeLine = "Act. " + hora;
+
+                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("bcv", bcvLine)
+                    .putString("par", parLine)
+                    .putString("time", hora)
+                    .apply();
+
+                views.setTextViewText(R.id.w_bcv, bcvLine);
+                views.setTextViewText(R.id.w_par, parLine);
+                views.setTextViewText(R.id.w_time, timeLine);
+            } catch (Exception e) {
+                SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                String cachedBcv = sp.getString("bcv", null);
+                String cachedPar = sp.getString("par", null);
+                String cachedTime = sp.getString("time", null);
+
+                String errMsg = e.getMessage();
+                if (errMsg == null || errMsg.trim().isEmpty()) {
+                    errMsg = e.getClass().getSimpleName();
+                }
+                if (errMsg.length() > 36) {
+                    errMsg = errMsg.substring(0, 36) + "…";
                 }
 
-                String hora = new SimpleDateFormat("hh:mm a", new Locale("es", "VE")).format(new Date());
-                views.setTextViewText(R.id.w_bcv, "BCV: " + bcvStr);
-                views.setTextViewText(R.id.w_par, "Par: " + parStr + " · USDT: " + usdtStr);
-                views.setTextViewText(R.id.w_time, "Act. " + hora);
-            } catch (Exception e) {
-                views.setTextViewText(R.id.w_time, "Sin conexión al actualizar");
+                if (cachedBcv != null && cachedPar != null) {
+                    views.setTextViewText(R.id.w_bcv, cachedBcv);
+                    views.setTextViewText(R.id.w_par, cachedPar);
+                    views.setTextViewText(R.id.w_time, "Err: " + errMsg + (cachedTime != null ? " (" + cachedTime + ")" : ""));
+                } else {
+                    views.setTextViewText(R.id.w_time, "Err: " + errMsg);
+                }
+            } finally {
+                if (conn != null) conn.disconnect();
             }
+
+            bindActions(context, mgr, id);
             mgr.updateAppWidget(id, views);
         });
     }
@@ -138,6 +201,13 @@ public class TasasWidgetProvider extends AppWidgetProvider {
             JSONObject obj = (JSONObject) val;
             if (obj.has("value") && !obj.isNull("value")) {
                 return obj.optDouble("value", Double.NaN);
+            }
+        }
+        if (val instanceof String) {
+            try {
+                return Double.parseDouble(((String) val).replace(",", "."));
+            } catch (Exception ignored) {
+                return null;
             }
         }
         return null;
