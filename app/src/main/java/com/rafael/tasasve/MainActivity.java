@@ -330,4 +330,165 @@ function cfmt(s){
 function cshow(){$("cdisp").textContent=cfmt(cur);$("cexpr").textContent=ex}
 function calc(a,o,b){
   var r=o==="+"?a+b:o==="-"?a-b:o==="*"?a*b:b===0?NaN:a/b;
-  return isNaN(r)?null:parseFloat(r
+  return isNaN(r)?null:parseFloat(r.toPrecision(12));
+}
+function press(k){
+  if(/^[0-9]$/.test(k)){if(fr){cur=k;fr=false}else if(cur.replace(/[-.]/g,"").length<12)cur=cur==="0"?k:cur+k}
+  else if(k==="."){if(fr){cur="0.";fr=false}else if(cur.indexOf(".")<0)cur+="."}
+  else if(SYM[k]){
+    if(op&&!fr){var r=calc(acc,op,parseFloat(cur));if(r===null){cur="0";ex="No se puede dividir entre 0";op=null;acc=null;fr=true;return cshow()}cur=String(r)}
+    acc=parseFloat(cur);op=k;fr=true;ex=cfmt(String(acc))+" "+SYM[k];
+  }
+  else if(k==="="){
+    if(op){var b=parseFloat(cur),r2=calc(acc,op,b);
+      if(r2===null){cur="0";ex="No se puede dividir entre 0"}else{ex=cfmt(String(acc))+" "+SYM[op]+" "+cfmt(String(b))+" =";cur=String(r2)}
+      op=null;acc=null;fr=true}
+  }
+  else if(k==="C"){cur="0";acc=null;op=null;fr=true;ex=""}
+  else if(k==="B"){if(!fr&&cur.length>1)cur=cur.slice(0,-1);else{cur="0";fr=true}if(cur==="-")cur="0"}
+  else if(k==="N"){if(cur!=="0")cur=cur[0]==="-"?cur.slice(1):"-"+cur}
+  else if(k==="%"){cur=String(parseFloat((parseFloat(cur)/100).toPrecision(12)));fr=true}
+  cshow();
+}
+var KEYS=[["C","C"],["⌫","B"],["%","%"],["÷","/"],["7","7"],["8","8"],["9","9"],["×","*"],["4","4"],["5","5"],["6","6"],["−","-"],["1","1"],["2","2"],["3","3"],["+","+"],["±","N"],["0","0"],[",","."],["=","="]];
+KEYS.forEach(function(k){
+  var b=document.createElement("button");b.type="button";b.textContent=k[0];
+  if("/*-+".indexOf(k[1])>-1||k[1]==="%")b.className="op";
+  if(k[1]==="=")b.className="eq";
+  b.addEventListener("click",function(){press(k[1])});
+  $("keys").appendChild(b);
+});
+[["BCV",function(){return data.bcv.usd}],["Paralelo",function(){return data.paralelo.usd}],["Euro",function(){return data.bcv.eur}],["USDT",function(){return usdtAvg()}]].forEach(function(q){
+  var b=document.createElement("button");b.type="button";b.textContent="Usar "+q[0];
+  b.addEventListener("click",function(){var v=q[1]();if(v==null)return;cur=String(parseFloat(v.toFixed(4)));fr=true;cshow()});
+  $("quick").appendChild(b);
+});
+
+var live=false;
+function dt(s,f){var d=s?new Date(s):null;return d&&!isNaN(d)?d:f}
+function track(k,v){
+  if(v==null)return null;
+  var s={};try{s=JSON.parse(localStorage.getItem("tv_"+k)||"{}")}catch(e){}
+  if(s.last!==undefined&&s.last!==v)s.prev=s.last;
+  s.last=v;try{localStorage.setItem("tv_"+k,JSON.stringify(s))}catch(e){}
+  return s.prev!==undefined?s.prev:v;
+}
+function addLog(src,val,prev,at,nodup){
+  if(val==null)return;
+  var last=log.filter(function(x){return x.src===src})[0];
+  if(last&&last.val===val&&(nodup||+last.at===+at))return;
+  log.unshift({at:at,src:src,val:val,delta:val-(prev==null?val:prev)});
+}
+function applyPayload(j,offlineNote){
+  var up=dt(j.updated,new Date()),bu=j.bcv&&j.bcv.usd,be=j.bcv&&j.bcv.eur,pa=j.paralelo;
+  if(!bu||!bu.value||!be||!be.value||!pa||!pa.value)throw new Error("faltan tasas");
+  var bd=dt(bu.at,up);
+  var nd={
+    bcv:{usd:bu.value,eur:be.value,prevUsd:track("usd",bu.value),prevEur:track("eur",be.value),at:up},
+    paralelo:{usd:pa.value,prevUsd:track("par",pa.value),at:dt(pa.at,up)},
+    binance:{buy:j.binance?j.binance.buy:null,sell:j.binance?j.binance.sell:null,at:up},
+    okx:{buy:j.okx?j.okx.buy:null,sell:j.okx?j.okx.sell:null,at:up},
+    world:data.world.map(function(w){var r=j.world&&j.world.rates&&j.world.rates[w.code];return {code:w.code,name:w.name,country:w.country,perUsd:r||w.perUsd}})
+  };
+  if(live||hasCached){["binance","okx"].forEach(function(k){if(avg(nd[k])===null&&avg(data[k])!==null)nd[k]=data[k]})}
+  nd.binance.prevAvg=track("bin",avg(nd.binance));
+  nd.okx.prevAvg=track("okx",avg(nd.okx));
+  var ds=bd.toLocaleDateString("es-VE",{day:"2-digit",month:"2-digit"});
+  addLog("Dólar BCV ("+ds+")",nd.bcv.usd,nd.bcv.prevUsd,up,true);
+  addLog("Euro BCV ("+ds+")",nd.bcv.eur,nd.bcv.prevEur,up,true);
+  addLog("Dólar paralelo",nd.paralelo.usd,nd.paralelo.prevUsd,nd.paralelo.at,true);
+  addLog("USDT OKX",avg(nd.okx),nd.okx.prevAvg,nd.okx.at,false);
+  addLog("USDT Binance",avg(nd.binance),nd.binance.prevAvg,nd.binance.at,false);
+  log.length=Math.min(log.length,20);
+  data=nd;build(offlineNote);
+}
+function loadCache(){
+  try{
+    var raw=localStorage.getItem("tv_cached_api");
+    if(!raw)return false;
+    applyPayload(JSON.parse(raw),true);
+    hasCached=true;
+    return true;
+  }catch(e){return false}
+}
+function loadReal(){
+  var btn=$("refresh"),ic=$("ref-ic");
+  btn.disabled=true;ic.classList.add("spin");
+  return fetch(API_URL).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).then(function(j){
+    try{localStorage.setItem("tv_cached_api",JSON.stringify(j))}catch(e){}
+    applyPayload(j,false);
+    live=true;hasCached=true;
+  }).catch(function(){
+    if(live||hasCached){renderRates(true)}
+    else{$("stamp").textContent="Sin conexión. Conéctate una vez para descargar las tasas."}
+  }).then(function(){btn.disabled=false;ic.classList.remove("spin")});
+}
+
+function updateThemeIcon(){
+  var r=document.documentElement,c=r.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+  $("theme").textContent=c==="dark"?"☀️":"🌙";
+}
+
+$("amt").addEventListener("input",convert);
+$("from").addEventListener("change",convert);
+$("to").addEventListener("change",convert);
+$("q").addEventListener("input",renderWorld);
+$("swap").addEventListener("click",function(){var a=$("from").value;$("from").value=$("to").value;$("to").value=a;convert()});
+$("result").addEventListener("click",function(){if(!lastConvVal)return;if(navigator.clipboard)navigator.clipboard.writeText(lastConvVal).catch(function(){});showToast("Copiado: "+lastConvVal)});
+$("refresh").addEventListener("click",function(){loadReal()});
+$("theme").addEventListener("click",function(){
+  var r=document.documentElement,c=r.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+  r.dataset.theme=c==="dark"?"light":"dark";
+  updateThemeIcon();
+});
+window.addEventListener("online",function(){loadReal()});
+setInterval(function(){if(live||hasCached)renderRates(!live)},20000);
+
+updateThemeIcon();
+data=makeSample();log=[];cshow();
+if(!loadCache()){build(false)}
+loadReal();
+setInterval(function(){loadReal()},60000);
+</script>
+</body>
+</html>
+""";
+
+    @SuppressLint("SetJavaScriptEnabled")
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        webView = new WebView(this);
+        webView.setLayoutParams(new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        setContentView(webView);
+
+        WebSettings s = webView.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setDatabaseEnabled(true);
+        s.setCacheMode(WebSettings.LOAD_DEFAULT);
+
+        webView.setBackgroundColor(0xFF0B1520);
+        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebViewClient(new WebViewClient());
+        webView.loadDataWithBaseURL(
+            "https://tasas-ve-api.rafael-f60.workers.dev/",
+            HTML,
+            "text/html",
+            "UTF-8",
+            null
+        );
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
+    }
+}
