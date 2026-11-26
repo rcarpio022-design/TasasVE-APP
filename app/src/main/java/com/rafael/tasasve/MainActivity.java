@@ -193,6 +193,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         createNotificationChannel();
+        requestNotifPermissionIfNeeded();
 
         webView = new WebView(this);
         webView.setLayoutParams(new ViewGroup.LayoutParams(
@@ -218,6 +219,14 @@ public class MainActivity extends Activity {
             "UTF-8",
             null
         );
+    }
+
+    private void requestNotifPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
+            }
+        }
     }
 
     private void createNotificationChannel() {
@@ -265,11 +274,7 @@ public class MainActivity extends Activity {
     public class Bridge {
         @JavascriptInterface
         public void requestNotifPermission() {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
-                }
-            }
+            runOnUiThread(() -> requestNotifPermissionIfNeeded());
         }
 
         @JavascriptInterface
