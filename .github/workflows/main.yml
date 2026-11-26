@@ -12,6 +12,35 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - name: Fix encoding and Gradle config
+        run: |
+          python3 -c '
+          import glob
+          for ext in ("**/*.gradle", "**/*.java", "**/*.xml", "**/*.html"):
+              for p in glob.glob(ext, recursive=True):
+                  b = open(p, "rb").read()
+                  if b.startswith(b"\xef\xbb\xbf"):
+                      open(p, "wb").write(b[3:])
+          '
+          sed -i 's/minSdk 24/minSdk 26/' app/build.gradle
+          cat << 'EOF' > settings.gradle
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "TasasVE"
+          include ':app'
+          EOF
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
