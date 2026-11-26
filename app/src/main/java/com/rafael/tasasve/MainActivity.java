@@ -3,6 +3,7 @@ package com.rafael.tasasve;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -22,6 +23,26 @@ public class MainActivity extends Activity {
     private static final int REQ_NOTIF = 1042;
     private int notifIdCounter = 100;
     private WebView webView;
+
+    private static final String[] MODE_LABELS = {
+        "Resumen (BCV · Par · USDT)",
+        "Dólar BCV",
+        "Euro BCV",
+        "Dólar Paralelo",
+        "USDT Promedio",
+        "USDT Binance",
+        "USDT OKX"
+    };
+
+    private static final String[] MODE_KEYS = {
+        "all",
+        "bcv",
+        "eur",
+        "par",
+        "usdt",
+        "bin",
+        "okx"
+    };
 
     private static final String HTML =
         "<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"utf-8\">" +
@@ -174,7 +195,7 @@ public class MainActivity extends Activity {
         "try{var rW=localStorage.getItem(\"tv_usdt_last\");if(rW!==null&&rW!==\"\")prevUsdtSaved=parseFloat(rW);if(curUsdt!=null)localStorage.setItem(\"tv_usdt_last\",String(curUsdt))}catch(e){}" +
         "if(!off){checkNotify(\"Dólar BCV\",nd.bcv.usd,prevUsdSaved,prevUsdSaved!==null);checkNotify(\"Euro BCV\",nd.bcv.eur,prevEurSaved,prevEurSaved!==null);checkNotify(\"Dólar paralelo\",nd.paralelo.usd,prevParSaved,prevParSaved!==null);checkNotify(\"USDT\",curUsdt,prevUsdtSaved,prevUsdtSaved!==null)}" +
         "var ds=bd.toLocaleDateString(\"es-VE\",{day:\"2-digit\",month:\"2-digit\"});addLog(\"Dólar BCV (\"+ds+\")\",nd.bcv.usd,nd.bcv.prevUsd,up,true);addLog(\"Euro BCV (\"+ds+\")\",nd.bcv.eur,nd.bcv.prevEur,up,true);addLog(\"Dólar paralelo\",nd.paralelo.usd,nd.paralelo.prevUsd,nd.paralelo.at,true);addLog(\"USDT OKX\",avg(nd.okx),nd.okx.prevAvg,nd.okx.at,false);addLog(\"USDT Binance\",avg(nd.binance),nd.binance.prevAvg,nd.binance.at,false);log.length=Math.min(log.length,20);" +
-        "if(window.AndroidBridge&&window.AndroidBridge.syncWidget){window.AndroidBridge.syncWidget(nd.bcv.usd||0,nd.paralelo.usd||0,curUsdt||0)}" +
+        "if(window.AndroidBridge&&window.AndroidBridge.syncWidget){var bA=avg(nd.binance),oA=avg(nd.okx);window.AndroidBridge.syncWidget(nd.bcv.usd||0,nd.bcv.eur||0,nd.paralelo.usd||0,curUsdt||0,bA||0,oA||0)}" +
         "data=nd;build(off)}" +
         "function loadCache(){try{var raw=localStorage.getItem(\"tv_cached_api\");if(!raw)return false;applyPayload(JSON.parse(raw),true);hasCached=true;return true}catch(e){return false}}" +
         "function loadReal(){var b=$(\"refresh\"),ic=$(\"ref-ic\");b.disabled=true;ic.classList.add(\"spin\");return fetch(API_URL).then(function(r){if(!r.ok)throw new Error(\"HTTP \"+r.status);return r.json()}).then(function(j){try{localStorage.setItem(\"tv_cached_api\",JSON.stringify(j))}catch(e){}applyPayload(j,false);live=true;hasCached=true}).catch(function(){if(live||hasCached){renderRates(true)}else{$(\"stamp\").textContent=\"Sin conexión. Conéctate una vez para descargar las tasas.\"}}).then(function(){b.disabled=false;ic.classList.remove(\"spin\")})}" +
@@ -221,6 +242,42 @@ public class MainActivity extends Activity {
             "UTF-8",
             null
         );
+
+        handleIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIntent(intent);
+    }
+
+    private void handleIntent(Intent intent) {
+        if (intent != null && intent.getBooleanExtra(TasasWidgetProvider.EXTRA_OPEN_CONFIG, false)) {
+            intent.removeExtra(TasasWidgetProvider.EXTRA_OPEN_CONFIG);
+            showWidgetModeDialog();
+        }
+    }
+
+    private void showWidgetModeDialog() {
+        String current = TasasWidgetProvider.getWidgetMode(this);
+        int checked = 0;
+        for (int i = 0; i < MODE_KEYS.length; i++) {
+            if (MODE_KEYS[i].equals(current)) {
+                checked = i;
+                break;
+            }
+        }
+
+        new AlertDialog.Builder(this)
+            .setTitle("Mostrar en el widget")
+            .setSingleChoiceItems(MODE_LABELS, checked, (dialog, which) -> {
+                TasasWidgetProvider.setWidgetMode(this, MODE_KEYS[which]);
+                dialog.dismiss();
+            })
+            .setNegativeButton("Cerrar", null)
+            .show();
     }
 
     private void requestNotifPermissionIfNeeded() {
@@ -285,10 +342,19 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void syncWidget(double bcvUsd, double parUsd, double usdtAvg) {
+        public void syncWidget(
+            double bcvUsd,
+            double bcvEur,
+            double parUsd,
+            double usdtAvg,
+            double binAvg,
+            double okxAvg
+        ) {
             runOnUiThread(() -> {
                 Double u = (usdtAvg > 0) ? usdtAvg : null;
-                TasasWidgetProvider.saveFromApp(MainActivity.this, bcvUsd, parUsd, u);
+                Double b = (binAvg > 0) ? binAvg : null;
+                Double o = (okxAvg > 0) ? okxAvg : null;
+                TasasWidgetProvider.saveFromApp(MainActivity.this, bcvUsd, bcvEur, parUsd, u, b, o);
             });
         }
     }
