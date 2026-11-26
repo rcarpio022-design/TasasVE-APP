@@ -1,15 +1,26 @@
 package com.rafael.tasasve;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.ViewGroup;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 public class MainActivity extends Activity {
+    private static final String CHANNEL_ID = "tasas_ve_alerts";
+    private static final int REQ_NOTIF = 1042;
+    private int notifIdCounter = 100;
     private WebView webView;
 
     private static final String HTML =
@@ -36,10 +47,11 @@ public class MainActivity extends Activity {
         ".icon-btn:active{transform:scale(.93)}" +
         ".icon-btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}" +
         ".spin{animation:rot .7s linear infinite}@keyframes rot{to{transform:rotate(360deg)}}" +
-        ".navchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-top:10px;padding-bottom:2px}" +
+        ".navchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-top:10px;padding-bottom:2px;align-items:center}" +
         ".navchips::-webkit-scrollbar{display:none}" +
-        ".navchips a{text-decoration:none;color:var(--muted);font-size:13px;font-weight:600;padding:5px 12px;border-radius:99px;background:color-mix(in srgb,var(--surface) 60%,transparent);border:1px solid color-mix(in srgb,var(--ink) 10%,transparent);white-space:nowrap}" +
+        ".navchips a,.alert-chip{text-decoration:none;color:var(--muted);font-size:13px;font-weight:600;padding:5px 12px;border-radius:99px;background:color-mix(in srgb,var(--surface) 60%,transparent);border:1px solid color-mix(in srgb,var(--ink) 10%,transparent);white-space:nowrap;cursor:pointer}" +
         ".navchips a:active{background:var(--ink);color:var(--bg)}" +
+        ".alert-chip.on{background:color-mix(in srgb,var(--up) 20%,transparent);color:var(--up);border-color:color-mix(in srgb,var(--up) 45%,transparent)}" +
         "main{max-width:1180px;margin:0 auto;padding:14px 14px 36px}" +
         ".grid{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}" +
         "@media(min-width:680px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wide,.last{grid-column:span 2}}" +
@@ -93,7 +105,7 @@ public class MainActivity extends Activity {
         "<header class=\"topbar\"><div class=\"topbar-in\"><div class=\"top\"><div><h1>Tasas VE</h1><p class=\"note\" id=\"stamp\">Cargando tasas…</p></div>" +
         "<div class=\"acts\"><button class=\"icon-btn\" id=\"theme\" type=\"button\" aria-label=\"Cambiar tema\">☀️</button>" +
         "<button class=\"icon-btn primary\" id=\"refresh\" type=\"button\" aria-label=\"Actualizar\"><span id=\"ref-ic\">↻</span></button></div></div>" +
-        "<nav class=\"navchips\"><a href=\"#sec-tasas\">Tasas</a><a href=\"#sec-brecha\">Brecha</a><a href=\"#sec-conv\">Convertidor</a><a href=\"#sec-calc\">Calculadora</a><a href=\"#sec-mundo\">Mundo</a></nav></div></header>" +
+        "<nav class=\"navchips\"><button class=\"alert-chip\" id=\"alert-btn\" type=\"button\">🔔 Alertas</button><a href=\"#sec-tasas\">Tasas</a><a href=\"#sec-brecha\">Brecha</a><a href=\"#sec-conv\">Convertidor</a><a href=\"#sec-calc\">Calculadora</a><a href=\"#sec-mundo\">Mundo</a></nav></div></header>" +
         "<main><div class=\"grid\" id=\"sec-tasas\">" +
         "<section class=\"tile c-bcv copyable\" id=\"t-usd\"></section>" +
         "<section class=\"tile c-eur copyable\" id=\"t-eur\"></section>" +
@@ -119,6 +131,7 @@ public class MainActivity extends Activity {
         "<input class=\"fld srch\" id=\"q\" type=\"search\" placeholder=\"Buscar moneda o país\"><div class=\"wl\" id=\"world\"></div></section>" +
         "</div></main><div class=\"toast\" id=\"toast\">Copiado</div><script>" +
         "var API_URL=\"https://tasas-ve-api.rafael-f60.workers.dev/api\",$=function(id){return document.getElementById(id)},data,items=[],log=[],hasCached=false,lastConvVal=\"\",toastTimer;" +
+        "var alertsEnabled=false;try{alertsEnabled=localStorage.getItem(\"tv_alerts\")===\"1\"}catch(e){}" +
         "function showToast(m){var t=$(\"toast\");t.textContent=m;t.classList.add(\"show\");clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove(\"show\")},1800)}" +
         "function copyVal(n){if(n==null||isNaN(n))return;var x=nf(n);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(x).catch(function(){})}else{var a=document.createElement(\"textarea\");a.value=x;document.body.appendChild(a);a.select();try{document.execCommand(\"copy\")}catch(e){}document.body.removeChild(a)}showToast(\"Copiado: Bs \"+x)}" +
         "function makeSample(){var n=Date.now();return{bcv:{usd:400,eur:460,prevUsd:400,prevEur:460,at:new Date(n)},binance:{buy:null,sell:null,prevAvg:null,at:new Date(n)},okx:{buy:null,sell:null,prevAvg:null,at:new Date(n)},paralelo:{usd:500,prevUsd:500,at:new Date(n)},world:[{code:\"COP\",name:\"Peso colombiano\",country:\"Colombia\",perUsd:4100},{code:\"BRL\",name:\"Real\",country:\"Brasil\",perUsd:5.4},{code:\"ARS\",name:\"Peso argentino\",country:\"Argentina\",perUsd:1000},{code:\"MXN\",name:\"Peso mexicano\",country:\"México\",perUsd:18.5},{code:\"CLP\",name:\"Peso chileno\",country:\"Chile\",perUsd:950},{code:\"PEN\",name:\"Sol\",country:\"Perú\",perUsd:3.75},{code:\"GBP\",name:\"Libra esterlina\",country:\"Reino Unido\",perUsd:0.78},{code:\"CAD\",name:\"Dólar canadiense\",country:\"Canadá\",perUsd:1.38},{code:\"DOP\",name:\"Peso dominicano\",country:\"República Dominicana\",perUsd:60},{code:\"PAB\",name:\"Balboa\",country:\"Panamá\",perUsd:1},{code:\"JPY\",name:\"Yen\",country:\"Japón\",perUsd:150}]}}" +
@@ -136,69 +149,6 @@ public class MainActivity extends Activity {
         "function pair(o){return'<div class=\"pr\"><span>Compra</span><b>'+bs(o.buy)+'</b></div><div class=\"pr\"><span>Venta</span><b>'+bs(o.sell)+'</b></div>'}" +
         "function renderRates(off){var b=data.bcv,bn=data.binance,ok=data.okx;tile(\"t-usd\",\"Dólar BCV\",\"Oficial · Copiar\",'<p class=\"big\">Bs '+nf(b.usd)+'</p>'+chip(b.usd,b.prevUsd),b.at,\"Verificado\",b.usd);tile(\"t-eur\",\"Euro BCV\",\"Oficial · Copiar\",'<p class=\"big\">Bs '+nf(b.eur)+'</p>'+chip(b.eur,b.prevEur),b.at,\"Verificado\",b.eur);usdtTile(\"t-bin\",\"USDT en Binance\",bn);usdtTile(\"t-okx\",\"USDT en OKX\",ok);var pa=data.paralelo,pg=(pa.usd-b.usd)/b.usd*100;tile(\"t-par\",\"Dólar paralelo\",\"Paralelo · Copiar\",'<p class=\"big\">Bs '+nf(pa.usd)+'</p>'+chip(pa.usd,pa.prevUsd)+'<div class=\"pr\"><span>Brecha con el BCV</span><b>'+(pg>=0?\"+\":\"\")+pg.toLocaleString(\"es-VE\",{maximumFractionDigits:1})+' %</b></div>',pa.at,\"Actualizado\",pa.usd);var lt=hhmm(new Date(Math.max(bn.at,ok.at,b.at,pa.at)));$(\"stamp\").textContent=off?\"Sin internet • Últimas tasas guardadas (\"+lt+\")\":\"Actualizado a las \"+lt;renderLog()}" +
         "function renderLog(){$(\"log\").innerHTML=log.map(function(e){return'<div class=\"row\"><div>'+e.src+'<small>'+hms(e.at)+', '+rel(e.at)+'</small></div><div class=\"v\">Bs '+nf(e.val)+' '+chip(e.val,e.val-e.delta)+'</div></div>'}).join(\"\")}" +
-        "function build(off){var b=data.bcv,bn=avg(data.binance),ok=avg(data.okx),usdt=usdtAvg();items=[{id:\"VES\",name:\"Bolívar (Bs)\",ves:1},{id:\"USD\",name:\"Dólar BCV\",ves:b.usd},{id:\"EUR\",name:\"Euro BCV\",ves:b.eur},{id:\"PAR\",name:\"Dólar paralelo\",ves:data.paralelo.usd},{id:\"USDTB\",name:\"USDT Binance\",ves:bn},{id:\"USDTO\",name:\"USDT OKX\",ves:ok}];data.world.forEach(function(w){items.push({id:w.code,name:w.name,ves:b.usd/w.perUsd})});items=items.filter(function(i){return i.ves!==null});var ref=usdt!==null?usdt:data.paralelo.usd,gap=(ref-b.usd)/b.usd*100;$(\"gapnum\").textContent=(gap>=0?\"+\":\"\")+gap.toLocaleString(\"es-VE\",{maximumFractionDigits:1})+\" %\";$(\"gaptxt\").textContent=\"El \"+(usdt!==null?\"USDT\":\"dólar paralelo\")+\" cuesta Bs \"+nf(Math.abs(ref-b.usd))+(ref>=b.usd?\" más\":\" menos\")+\" que el dólar oficial.\";var max=Math.max(ref,b.usd,b.eur,data.paralelo.usd);[[\"1\",b.usd],[\"3\",b.eur],[\"4\",data.paralelo.usd],[\"2\",usdt]].forEach(function(p){$(\"b\"+p[0]).textContent=p[1]===null?\"No disponible\":\"Bs \"+nf(p[1]);$(\"f\"+p[0]).style.width=(p[1]===null?0:p[1]/max*100)+\"%\"});[\"from\",\"to\"].forEach(function(id){var s=$(id),k=s.value;s.textContent=\"\";items.forEach(function(it){var o=document.createElement(\"option\");o.value=it.id;o.textContent=(it.id.indexOf(\"USDT\")===0||it.id===\"PAR\")?it.name:it.id+\" \"+it.name;s.appendChild(o)});s.value=k||(id===\"from\"?\"USD\":\"VES\")});renderRates(off);convert();renderWorld()}" +
+        "function build(off){var b=data.bcv,bn=avg(data.binance),ok=avg(data.okx),usdt=usdtAvg();items=[{id:\"VES\",name:\"Bolívar (Bs)\",ves:1},{id:\"USD\",name:\"Dólar BCV\",ves:b.usd},{id:\"EUR\",name:\"Euro BCV\",ves:b.eur},{id:\"PAR\",name:\"Dólar paralelo\",ves:data.paralelo.usd},{id:\"USDTB\",name:\"USDT Binance\",ves:bn},{id:\"USDTO\",name:\"USDT OKX\",ves:ok}];data.world.forEach(function(w){items.push({id:w.code,name:w.name,ves:b.usd/w.perUsd})});items=items.filter(function(i){return i.ves!==null});var ref=usdt!==null?usdt:data.paralelo.usd,gap=(ref-b.usd)/b.usd*100;$(\"gapnum\").textContent=(gap>=0?\"+\":\"\")+gap.toLocaleString(\"es-VE\",{maximumFractionDigits:1})+\" \%\";$(\"gaptxt\").textContent=\"El \"+(usdt!==null?\"USDT\":\"dólar paralelo\")+\" cuesta Bs \"+nf(Math.abs(ref-b.usd))+(ref>=b.usd?\" más\":\" menos\")+\" que el dólar oficial.\";var max=Math.max(ref,b.usd,b.eur,data.paralelo.usd);[[\"1\",b.usd],[\"3\",b.eur],[\"4\",data.paralelo.usd],[\"2\",usdt]].forEach(function(p){$(\"b\"+p[0]).textContent=p[1]===null?\"No disponible\":\"Bs \"+nf(p[1]);$(\"f\"+p[0]).style.width=(p[1]===null?0:p[1]/max*100)+\"%\"});[\"from\",\"to\"].forEach(function(id){var s=$(id),k=s.value;s.textContent=\"\";items.forEach(function(it){var o=document.createElement(\"option\");o.value=it.id;o.textContent=(it.id.indexOf(\"USDT\")===0||it.id===\"PAR\")?it.name:it.id+\" \"+it.name;s.appendChild(o)});s.value=k||(id===\"from\"?\"USD\":\"VES\")});renderRates(off);convert();renderWorld()}" +
         "function short(id){return id.indexOf(\"USDT\")===0?\"USDT\":id===\"PAR\"?\"USD paralelo\":id}" +
-        "function convert(){var a=parseFloat($(\"amt\").value)||0,f=items.filter(function(i){return i.id===$(\"from\").value})[0],t=items.filter(function(i){return i.id===$(\"to\").value})[0];if(!f||!t)return;var val=a*f.ves/t.ves;lastConvVal=nf(val);$(\"result\").innerHTML=lastConvVal+\" \"+short(t.id)+\"<small>1 \"+short(f.id)+\" = \"+nf(f.ves/t.ves)+\" \"+short(t.id)+\"</small>\"}" +
-        "function renderWorld(){var q=$(\"q\").value.trim().toLowerCase(),box=$(\"world\"),list=data.world.filter(function(w){return!q||(w.code+\" \"+w.name+\" \"+w.country).toLowerCase().indexOf(q)>-1});box.innerHTML=list.length?list.map(function(w){return'<div class=\"row\"><div class=\"w-left\"><span class=\"w-badge\">'+w.code+'</span><div class=\"w-info\"><div class=\"w-name\">'+w.name+'</div><small>'+w.country+'</small></div></div><div class=\"v\">Bs '+nf(data.bcv.usd/w.perUsd)+'</div></div>'}).join(\"\"):'<p class=\"note\">No hay resultados.</p>'}" +
-        "var cur=\"0\",acc=null,op=null,fr=true,ex=\"\",SYM={\"+\":\"+\",\"-\":\"−\",\"*\":\"×\",\"/\":\"÷\"};" +
-        "function cfmt(s){var neg=s[0]===\"-\",t=neg?s.slice(1):s,p=t.split(\".\"),i=isFinite(p[0])?parseInt(p[0],10).toLocaleString(\"es-VE\"):p[0];return(neg?\"-\":\"\")+i+(p.length>1?\",\"+p[1]:\"\")}" +
-        "function cshow(){$(\"cdisp\").textContent=cfmt(cur);$(\"cexpr\").textContent=ex}" +
-        "function calc(a,o,b){var r=o===\"+\"?a+b:o===\"-\"?a-b:o===\"*\"?a*b:b===0?NaN:a/b;return isNaN(r)?null:parseFloat(r.toPrecision(12))}" +
-        "function press(k){if(/^[0-9]$/.test(k)){if(fr){cur=k;fr=false}else if(cur.replace(/[-.]/g,\"\").length<12)cur=cur===\"0\"?k:cur+k}else if(k===\".\"){if(fr){cur=\"0.\";fr=false}else if(cur.indexOf(\".\")<0)cur+=\".\"}else if(SYM[k]){if(op&&!fr){var r=calc(acc,op,parseFloat(cur));if(r===null){cur=\"0\";ex=\"No se puede dividir entre 0\";op=null;acc=null;fr=true;return cshow()}cur=String(r)}acc=parseFloat(cur);op=k;fr=true;ex=cfmt(String(acc))+\" \"+SYM[k]}else if(k===\"=\"){if(op){var b=parseFloat(cur),r2=calc(acc,op,b);if(r2===null){cur=\"0\";ex=\"No se puede dividir entre 0\"}else{ex=cfmt(String(acc))+\" \"+SYM[op]+\" \"+cfmt(String(b))+\" =\";cur=String(r2)}op=null;acc=null;fr=true}}else if(k===\"C\"){cur=\"0\";acc=null;op=null;fr=true;ex=\"\"}else if(k===\"B\"){if(!fr&&cur.length>1)cur=cur.slice(0,-1);else{cur=\"0\";fr=true}if(cur===\"-\")cur=\"0\"}else if(k===\"N\"){if(cur!==\"0\")cur=cur[0]===\"-\"?cur.slice(1):\"-\"+cur}else if(k===\"%\"){cur=String(parseFloat((parseFloat(cur)/100).toPrecision(12)));fr=true}cshow()}" +
-        "var KEYS=[[\"C\",\"C\"],[\"⌫\",\"B\"],[\"%\",\"%\"],[\"÷\",\"/\"],[\"7\",\"7\"],[\"8\",\"8\"],[\"9\",\"9\"],[\"×\",\"*\"],[\"4\",\"4\"],[\"5\",\"5\"],[\"6\",\"6\"],[\"−\",\"-\"],[\"1\",\"1\"],[\"2\",\"2\"],[\"3\",\"3\"],[\"+\",\"+\"],[\"±\",\"N\"],[\"0\",\"0\"],[\",\",\".\"],[\"=\",\"=\"]];" +
-        "KEYS.forEach(function(k){var b=document.createElement(\"button\");b.type=\"button\";b.textContent=k[0];if(\"/*-+\".indexOf(k[1])>-1||k[1]===\"%\")b.className=\"op\";if(k[1]===\"=\")b.className=\"eq\";b.addEventListener(\"click\",function(){press(k[1])});$(\"keys\").appendChild(b)});" +
-        "[[\"BCV\",function(){return data.bcv.usd}],[\"Paralelo\",function(){return data.paralelo.usd}],[\"Euro\",function(){return data.bcv.eur}],[\"USDT\",function(){return usdtAvg()}]].forEach(function(q){var b=document.createElement(\"button\");b.type=\"button\";b.textContent=\"Usar \"+q[0];b.addEventListener(\"click\",function(){var v=q[1]();if(v==null)return;cur=String(parseFloat(v.toFixed(4)));fr=true;cshow()});$(\"quick\").appendChild(b)});" +
-        "var live=false;function dt(s,f){var d=s?new Date(s):null;return d&&!isNaN(d)?d:f}" +
-        "function track(k,v){if(v==null)return null;var s={};try{s=JSON.parse(localStorage.getItem(\"tv_\"+k)||\"{}\")}catch(e){}if(s.last!==undefined&&s.last!==v)s.prev=s.last;s.last=v;try{localStorage.setItem(\"tv_\"+k,JSON.stringify(s))}catch(e){}return s.prev!==undefined?s.prev:v}" +
-        "function addLog(src,val,prev,at,nodup){if(val==null)return;var last=log.filter(function(x){return x.src===src})[0];if(last&&last.val===val&&(nodup||+last.at===+at))return;log.unshift({at:at,src:src,val:val,delta:val-(prev==null?val:prev)})}" +
-        "function applyPayload(j,off){var up=dt(j.updated,new Date()),bu=j.bcv&&j.bcv.usd,be=j.bcv&&j.bcv.eur,pa=j.paralelo;if(!bu||!bu.value||!be||!be.value||!pa||!pa.value)throw new Error(\"faltan tasas\");var bd=dt(bu.at,up),nd={bcv:{usd:bu.value,eur:be.value,prevUsd:track(\"usd\",bu.value),prevEur:track(\"eur\",be.value),at:up},paralelo:{usd:pa.value,prevUsd:track(\"par\",pa.value),at:dt(pa.at,up)},binance:{buy:j.binance?j.binance.buy:null,sell:j.binance?j.binance.sell:null,at:up},okx:{buy:j.okx?j.okx.buy:null,sell:j.okx?j.okx.sell:null,at:up},world:data.world.map(function(w){var r=j.world&&j.world.rates&&j.world.rates[w.code];return{code:w.code,name:w.name,country:w.country,perUsd:r||w.perUsd}})};if(live||hasCached){[\"binance\",\"okx\"].forEach(function(k){if(avg(nd[k])===null&&avg(data[k])!==null)nd[k]=data[k]})}nd.binance.prevAvg=track(\"bin\",avg(nd.binance));nd.okx.prevAvg=track(\"okx\",avg(nd.okx));var ds=bd.toLocaleDateString(\"es-VE\",{day:\"2-digit\",month:\"2-digit\"});addLog(\"Dólar BCV (\"+ds+\")\",nd.bcv.usd,nd.bcv.prevUsd,up,true);addLog(\"Euro BCV (\"+ds+\")\",nd.bcv.eur,nd.bcv.prevEur,up,true);addLog(\"Dólar paralelo\",nd.paralelo.usd,nd.paralelo.prevUsd,nd.paralelo.at,true);addLog(\"USDT OKX\",avg(nd.okx),nd.okx.prevAvg,nd.okx.at,false);addLog(\"USDT Binance\",avg(nd.binance),nd.binance.prevAvg,nd.binance.at,false);log.length=Math.min(log.length,20);data=nd;build(off)}" +
-        "function loadCache(){try{var raw=localStorage.getItem(\"tv_cached_api\");if(!raw)return false;applyPayload(JSON.parse(raw),true);hasCached=true;return true}catch(e){return false}}" +
-        "function loadReal(){var b=$(\"refresh\"),ic=$(\"ref-ic\");b.disabled=true;ic.classList.add(\"spin\");return fetch(API_URL).then(function(r){if(!r.ok)throw new Error(\"HTTP \"+r.status);return r.json()}).then(function(j){try{localStorage.setItem(\"tv_cached_api\",JSON.stringify(j))}catch(e){}applyPayload(j,false);live=true;hasCached=true}).catch(function(){if(live||hasCached){renderRates(true)}else{$(\"stamp\").textContent=\"Sin conexión. Conéctate una vez para descargar las tasas.\"}}).then(function(){b.disabled=false;ic.classList.remove(\"spin\")})}" +
-        "function updateThemeIcon(){var r=document.documentElement,c=r.dataset.theme||(matchMedia(\"(prefers-color-scheme: dark)\").matches?\"dark\":\"light\");$(\"theme\").textContent=c===\"dark\"?\"☀️\":\"🌙\"}" +
-        "$(\"amt\").addEventListener(\"input\",convert);$(\"from\").addEventListener(\"change\",convert);$(\"to\").addEventListener(\"change\",convert);$(\"q\").addEventListener(\"input\",renderWorld);" +
-        "$(\"swap\").addEventListener(\"click\",function(){var a=$(\"from\").value;$(\"from\").value=$(\"to\").value;$(\"to\").value=a;convert()});" +
-        "$(\"result\").addEventListener(\"click\",function(){if(!lastConvVal)return;if(navigator.clipboard)navigator.clipboard.writeText(lastConvVal).catch(function(){});showToast(\"Copiado: \"+lastConvVal)});" +
-        "$(\"refresh\").addEventListener(\"click\",function(){loadReal()});" +
-        "$(\"theme\").addEventListener(\"click\",function(){var r=document.documentElement,c=r.dataset.theme||(matchMedia(\"(prefers-color-scheme: dark)\").matches?\"dark\":\"light\");r.dataset.theme=c===\"dark\"?\"light\":\"dark\";updateThemeIcon()});" +
-        "window.addEventListener(\"online\",function(){loadReal()});setInterval(function(){if(live||hasCached)renderRates(!live)},20000);" +
-        "updateThemeIcon();data=makeSample();log=[];cshow();if(!loadCache()){build(false)}loadReal();setInterval(function(){loadReal()},60000);" +
-        "</script></body></html>";
-
-    @SuppressLint("SetJavaScriptEnabled")
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        webView = new WebView(this);
-        webView.setLayoutParams(new ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        ));
-        setContentView(webView);
-
-        WebSettings s = webView.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setDatabaseEnabled(true);
-        s.setCacheMode(WebSettings.LOAD_DEFAULT);
-
-        webView.setBackgroundColor(0xFF0B1520);
-        webView.setWebChromeClient(new WebChromeClient());
-        webView.setWebViewClient(new WebViewClient());
-        webView.loadDataWithBaseURL(
-            "https://tasas-ve-api.rafael-f60.workers.dev/",
-            HTML,
-            "text/html",
-            "UTF-8",
-            null
-        );
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            super.onBackPressed();
-        }
-    }
-}
+        "function convert(){var a=parseFloat($(\"amt\").value)||0,f=items.filter(function(i){return i.id===$(\"from\").value})[0],t=items.filter(function(i){return i.id===$(\"to\").value})[0];if(!f||!t)
