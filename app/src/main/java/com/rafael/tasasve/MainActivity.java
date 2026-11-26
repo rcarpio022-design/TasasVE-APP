@@ -29,89 +29,118 @@ public class MainActivity extends Activity {
   :root:not([data-theme="light"]){--bg:#0B1520;--surface:#132130;--ink:#E8EEF5;--muted:#93A4B8;--line:#23354A;--bcv:#6FA3E6;--eur:#B7A2FF;--usdt:#F2B705;--gap:#FF7A6B;--up:#4CD08F;--down:#FF7A6B;--focus:#6FA3E6;color-scheme:dark}
 }
 :root[data-theme="dark"]{--bg:#0B1520;--surface:#132130;--ink:#E8EEF5;--muted:#93A4B8;--line:#23354A;--bcv:#6FA3E6;--eur:#B7A2FF;--usdt:#F2B705;--gap:#FF7A6B;--up:#4CD08F;--down:#FF7A6B;--focus:#6FA3E6;color-scheme:dark}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:116px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.4}
-main{max-width:1180px;margin:0 auto;padding:18px 14px 40px}
-h1{font-size:clamp(26px,4vw,36px);line-height:1.05;margin:0;font-weight:800;letter-spacing:-.02em}
-h2{font-size:16px;margin:0;font-weight:600}
+.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 82%,transparent);-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);border-bottom:1px solid color-mix(in srgb,var(--ink) 8%,transparent);padding:12px 14px 10px}
+.topbar-in{max-width:1180px;margin:0 auto}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+h1{font-size:clamp(24px,5vw,32px);line-height:1.05;margin:0;font-weight:800;letter-spacing:-.02em}
+h2{font-size:16px;margin:0;font-weight:700}
 button,input,select{font:inherit;color:inherit}
-.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-.note{color:var(--muted);font-size:14px;margin:6px 0 0}
-.acts{display:flex;gap:8px}
-.btn{background:var(--ink);color:var(--bg);border:0;border-radius:12px;padding:10px 16px;font-weight:600;cursor:pointer;white-space:nowrap}
-.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.note{color:var(--muted);font-size:13px;margin:3px 0 0}
+.acts{display:flex;gap:8px;flex:none}
+.icon-btn{width:40px;height:40px;border-radius:12px;border:1px solid color-mix(in srgb,var(--ink) 14%,transparent);background:color-mix(in srgb,var(--surface) 65%,transparent);display:grid;place-items:center;font-size:18px;font-weight:700;cursor:pointer;transition:transform .15s}
+.icon-btn:active{transform:scale(.93)}
+.icon-btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.spin{animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.navchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-top:10px;padding-bottom:2px}
+.navchips::-webkit-scrollbar{display:none}
+.navchips a{text-decoration:none;color:var(--muted);font-size:13px;font-weight:600;padding:5px 12px;border-radius:99px;background:color-mix(in srgb,var(--surface) 60%,transparent);border:1px solid color-mix(in srgb,var(--ink) 10%,transparent);white-space:nowrap;transition:background .15s,color .15s}
+.navchips a:active{background:var(--ink);color:var(--bg)}
+main{max-width:1180px;margin:0 auto;padding:14px 14px 36px}
 .grid{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
 @media(min-width:680px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.wide,.last{grid-column:span 2}}
-.tile{background:color-mix(in srgb,var(--surface) 75%,transparent);border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);box-shadow:inset 0 3px 0 var(--c,transparent),0 8px 24px color-mix(in srgb,var(--ink) 10%,transparent);border-radius:22px;padding:16px 18px 18px;min-width:0}
+.tile{background:color-mix(in srgb,var(--surface) 75%,transparent);border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);box-shadow:inset 0 3px 0 var(--c,transparent),0 8px 24px color-mix(in srgb,var(--ink) 10%,transparent);border-radius:22px;padding:16px 18px 18px;min-width:0;position:relative;transition:transform .12s}
+.tile.copyable{cursor:pointer}
+.tile.copyable:active{transform:scale(.985)}
 .c-bcv{--c:var(--bcv)}.c-eur{--c:var(--eur)}.c-par{--c:#12A59B}.c-usdt{--c:var(--usdt)}.c-gap{--c:var(--gap)}
 .th{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-.src{margin-left:auto;font-size:13px;color:var(--muted)}
-.dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none}
-.dot.ok{background:var(--up)}.dot.mid{background:var(--usdt)}
-.big{font-size:clamp(30px,4.2vw,42px);font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:0 0 8px;font-variant-numeric:tabular-nums}
+.src{margin-left:auto;font-size:12px;color:var(--muted);font-weight:600}
+.copy-hint{font-size:11px;color:var(--muted);opacity:.75;margin-left:auto}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.dot.ok{background:var(--up);box-shadow:0 0 0 3px color-mix(in srgb,var(--up) 22%,transparent)}.dot.mid{background:var(--usdt)}
+.big{font-size:clamp(30px,4.2vw,42px);font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:0 0 8px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .lab{font-size:13px;color:var(--muted);margin:0 0 2px}
-.chip{display:inline-block;font-size:13px;font-weight:600;padding:3px 9px;border-radius:99px;background:color-mix(in srgb,var(--ink) 8%,transparent);color:var(--muted);white-space:nowrap}
+.chip{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:99px;background:color-mix(in srgb,var(--ink) 8%,transparent);color:var(--muted);white-space:nowrap}
 .chip.up{color:var(--up)}.chip.down{color:var(--down)}
 .pr{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
 .pr:first-of-type{margin-top:12px}
 .pr span{color:var(--muted)}
-.tf{font-size:13px;color:var(--muted);margin:12px 0 0}
+.tf{font-size:12px;color:var(--muted);margin:12px 0 0}
 .gapnum{font-size:clamp(44px,8vw,64px);font-weight:800;letter-spacing:-.03em;line-height:1;color:var(--gap);margin:0 0 4px}
-.gaptxt{margin:0 0 16px;color:var(--muted);font-size:15px}
+.gaptxt{margin:0 0 16px;color:var(--muted);font-size:14px}
 .bar{margin-bottom:10px}
 .bar .lbl{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}
-.track{height:12px;background:color-mix(in srgb,var(--ink) 10%,transparent);border-radius:6px;overflow:hidden}
+.track{height:11px;background:color-mix(in srgb,var(--ink) 10%,transparent);border-radius:6px;overflow:hidden}
 .fill{height:100%;border-radius:6px;transition:width .5s}
-.row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .row:last-child{border-bottom:0}
-.row small{display:block;color:var(--muted);font-size:13px}
-.v{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
-.log{max-height:300px;overflow-y:auto}
+.row small{display:block;color:var(--muted);font-size:12px}
+.w-left{display:flex;align-items:center;gap:10px;min-width:0}
+.w-badge{flex:none;font-size:11px;font-weight:800;letter-spacing:.03em;padding:5px 8px;border-radius:9px;background:color-mix(in srgb,var(--bcv) 18%,transparent);color:var(--bcv);min-width:44px;text-align:center}
+.w-info{min-width:0}
+.w-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;flex:none}
+.log{max-height:280px;overflow-y:auto}
 .conv{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:end;margin-top:12px}
 .conv label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
 .fld{width:100%;background:color-mix(in srgb,var(--surface) 45%,transparent);border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);border-radius:12px;padding:11px;min-width:0}
 .amount{grid-column:1/-1}
 .swap{background:color-mix(in srgb,var(--surface) 45%,transparent);border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);border-radius:12px;height:44px;width:44px;cursor:pointer;font-size:18px}
-.result{grid-column:1/-1;margin-top:8px;font-size:clamp(26px,4vw,34px);font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.result small{display:block;font-size:14px;font-weight:400;color:var(--muted);letter-spacing:0}
+.result{grid-column:1/-1;margin-top:8px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--ink) 6%,transparent);font-size:clamp(24px,4vw,32px);font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;cursor:pointer}
+.result:active{transform:scale(.99)}
+.result small{display:block;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:2px}
 .calc{margin-top:12px}
 .cexpr{min-height:20px;text-align:right;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
 .cdisp{text-align:right;font-size:clamp(34px,6vw,44px);font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;margin-bottom:10px}
 .quick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-.quick button{background:color-mix(in srgb,var(--surface) 45%,transparent);border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);border-radius:99px;padding:6px 12px;font-size:13px;cursor:pointer}
+.quick button{background:color-mix(in srgb,var(--surface) 45%,transparent);border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);border-radius:99px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer}
 .keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .keys button{height:54px;border-radius:14px;border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);background:color-mix(in srgb,var(--surface) 45%,transparent);font-size:20px;font-weight:600;cursor:pointer}
-.keys button:active{transform:scale(.97)}
+.keys button:active{transform:scale(.96)}
 .keys .op{color:var(--bcv)}
 .keys .eq{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.wl{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:0 28px}
+.wl{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:0 28px}
 .srch{margin:10px 0 6px}
-.foot{color:var(--muted);font-size:13px;text-align:center;margin-top:16px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-size:14px;font-weight:700;box-shadow:0 10px 25px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(520px 420px at 8% 4%,color-mix(in srgb,var(--bcv) 38%,transparent),transparent 70%),radial-gradient(480px 400px at 92% 10%,color-mix(in srgb,var(--eur) 34%,transparent),transparent 70%),radial-gradient(560px 460px at 85% 92%,color-mix(in srgb,var(--usdt) 32%,transparent),transparent 70%)}
 </style>
 </head>
 <body>
-<main>
-  <div class="top">
-    <div>
-      <h1>Tasas VE</h1>
-      <p class="note" id="stamp">Cargando tasas…</p>
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="top">
+      <div>
+        <h1>Tasas VE</h1>
+        <p class="note" id="stamp">Cargando tasas…</p>
+      </div>
+      <div class="acts">
+        <button class="icon-btn" id="theme" type="button" aria-label="Cambiar tema">☀️</button>
+        <button class="icon-btn primary" id="refresh" type="button" aria-label="Actualizar"><span id="ref-ic">↻</span></button>
+      </div>
     </div>
-    <div class="acts">
-      <button class="btn ghost" id="theme" type="button">Claro/Oscuro</button>
-      <button class="btn" id="refresh" type="button">Actualizar</button>
-    </div>
+    <nav class="navchips">
+      <a href="#sec-tasas">Tasas</a>
+      <a href="#sec-brecha">Brecha</a>
+      <a href="#sec-conv">Convertidor</a>
+      <a href="#sec-calc">Calculadora</a>
+      <a href="#sec-mundo">Mundo</a>
+    </nav>
   </div>
+</header>
 
-  <div class="grid">
-    <section class="tile c-bcv" id="t-usd"></section>
-    <section class="tile c-eur" id="t-eur"></section>
-    <section class="tile c-par" id="t-par"></section>
-    <section class="tile c-usdt" id="t-bin"></section>
-    <section class="tile c-usdt last" id="t-okx"></section>
+<main>
+  <div class="grid" id="sec-tasas">
+    <section class="tile c-bcv copyable" id="t-usd"></section>
+    <section class="tile c-eur copyable" id="t-eur"></section>
+    <section class="tile c-par copyable" id="t-par"></section>
+    <section class="tile c-usdt copyable" id="t-bin"></section>
+    <section class="tile c-usdt last copyable" id="t-okx"></section>
 
-    <section class="tile c-gap wide">
+    <section class="tile c-gap wide" id="sec-brecha">
       <div class="th"><h2>Brecha entre el BCV y el USDT</h2></div>
       <p class="gapnum" id="gapnum">0 %</p>
       <p class="gaptxt" id="gaptxt"></p>
@@ -121,13 +150,8 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
       <div class="bar"><div class="lbl"><span>USDT promedio</span><b id="b2"></b></div><div class="track"><div class="fill" id="f2" style="background:var(--usdt)"></div></div></div>
     </section>
 
-    <section class="tile wide">
-      <div class="th"><h2>Historial de actualizaciones</h2></div>
-      <div class="log" id="log"></div>
-    </section>
-
-    <section class="tile wide">
-      <div class="th"><h2>Convertidor de monedas</h2></div>
+    <section class="tile wide" id="sec-conv">
+      <div class="th"><h2>Convertidor de monedas</h2><span class="copy-hint">Toca el resultado para copiar</span></div>
       <div class="conv">
         <div class="amount"><label for="amt">Monto</label><input class="fld" id="amt" type="number" inputmode="decimal" value="100" min="0"></div>
         <div><label for="from">De</label><select class="fld" id="from"></select></div>
@@ -137,7 +161,7 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
       </div>
     </section>
 
-    <section class="tile wide">
+    <section class="tile wide" id="sec-calc">
       <div class="th"><h2>Calculadora</h2></div>
       <div class="calc">
         <div class="cexpr" id="cexpr"></div>
@@ -148,18 +172,45 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
     </section>
 
     <section class="tile wide">
-      <div class="th"><h2>Monedas del mundo</h2><span class="src">Valor en bolívares según el dólar BCV</span></div>
+      <div class="th"><h2>Historial de actualizaciones</h2></div>
+      <div class="log" id="log"></div>
+    </section>
+
+    <section class="tile wide" id="sec-mundo">
+      <div class="th"><h2>Monedas del mundo</h2><span class="src">Segun dólar BCV</span></div>
       <input class="fld srch" id="q" type="search" placeholder="Buscar moneda o país">
       <div class="wl" id="world"></div>
     </section>
   </div>
-  <p class="foot">Fuentes: BCV y paralelo vía DolarApi, USDT desde el P2P de Binance y OKX, monedas del mundo vía open.er-api.com.</p>
 </main>
+
+<div class="toast" id="toast">Copiado</div>
 
 <script>
 var API_URL = "https://tasas-ve-api.rafael-f60.workers.dev/api";
 var $ = function(id){return document.getElementById(id)};
-var data, items = [], log = [], hasCached = false;
+var data, items = [], log = [], hasCached = false, lastConvVal = "";
+
+var toastTimer;
+function showToast(msg){
+  var t=$("toast");
+  t.textContent=msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.remove("show")},1800);
+}
+function copyVal(num){
+  if(num==null||isNaN(num))return;
+  var txt=nf(num);
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).catch(function(){});
+  }else{
+    var ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();
+    try{document.execCommand("copy")}catch(e){}
+    document.body.removeChild(ta);
+  }
+  showToast("Copiado: Bs "+txt);
+}
 
 function makeSample(){
   var n = Date.now();
@@ -193,29 +244,31 @@ function chip(c,p){
   var up=d>0;
   return '<span class="chip '+(up?"up":"down")+'">'+(up?"▲ ":"▼ ")+nf(Math.abs(d))+" ("+Math.abs(d/p*100).toLocaleString("es-VE",{maximumFractionDigits:1})+" %)</span>";
 }
-function tile(id,title,sub,body,at,note){
-  $(id).innerHTML='<div class="th"><span class="dot '+fresh(at)+'"></span><h2>'+title+'</h2><span class="src">'+sub+'</span></div>'+body+'<p class="tf">'+note+' a las '+hhmm(at)+', '+rel(at)+'</p>';
+function tile(id,title,sub,body,at,note,valToCopy){
+  var el=$(id);
+  el.innerHTML='<div class="th"><span class="dot '+fresh(at)+'"></span><h2>'+title+'</h2><span class="src">'+sub+'</span></div>'+body+'<p class="tf">'+note+' a las '+hhmm(at)+', '+rel(at)+'</p>';
+  el.onclick=valToCopy!=null?function(){copyVal(valToCopy)}:null;
 }
 function avg(o){var v=[o.buy,o.sell].filter(function(x){return x!=null});return v.length?v.reduce(function(a,c){return a+c},0)/v.length:null}
 function bs(x){return x==null?"—":"Bs "+nf(x)}
 function usdtAvg(){var v=[avg(data.binance),avg(data.okx)].filter(function(x){return x!==null});return v.length?v.reduce(function(a,c){return a+c},0)/v.length:null}
 function usdtTile(id,title,o){
   var a=avg(o);
-  if(a===null){tile(id,title,"P2P",'<p class="big">—</p><p class="lab">No disponible ahora. Se reintenta al actualizar.</p>',o.at,"Último intento");return}
-  tile(id,title,"P2P",'<p class="lab">Promedio</p><p class="big">Bs '+nf(a)+'</p>'+chip(a,o.prevAvg)+pair(o),o.at,"Actualizado");
+  if(a===null){tile(id,title,"P2P",'<p class="big">—</p><p class="lab">No disponible ahora. Se reintenta al actualizar.</p>',o.at,"Último intento",null);return}
+  tile(id,title,"P2P",'<p class="lab">Promedio · Toca para copiar</p><p class="big">Bs '+nf(a)+'</p>'+chip(a,o.prevAvg)+pair(o),o.at,"Actualizado",a);
 }
 function pair(o){return '<div class="pr"><span>Compra</span><b>'+bs(o.buy)+'</b></div><div class="pr"><span>Venta</span><b>'+bs(o.sell)+'</b></div>'}
 
 function renderRates(offlineNote){
   var b=data.bcv,bn=data.binance,ok=data.okx;
-  tile("t-usd","Dólar BCV","Tasa oficial",'<p class="big">Bs '+nf(b.usd)+'</p>'+chip(b.usd,b.prevUsd),b.at,"Verificado");
-  tile("t-eur","Euro BCV","Tasa oficial",'<p class="big">Bs '+nf(b.eur)+'</p>'+chip(b.eur,b.prevEur),b.at,"Verificado");
+  tile("t-usd","Dólar BCV","Oficial · Copiar",'<p class="big">Bs '+nf(b.usd)+'</p>'+chip(b.usd,b.prevUsd),b.at,"Verificado",b.usd);
+  tile("t-eur","Euro BCV","Oficial · Copiar",'<p class="big">Bs '+nf(b.eur)+'</p>'+chip(b.eur,b.prevEur),b.at,"Verificado",b.eur);
   usdtTile("t-bin","USDT en Binance",bn);
   usdtTile("t-okx","USDT en OKX",ok);
   var pa=data.paralelo,pg=(pa.usd-b.usd)/b.usd*100;
-  tile("t-par","Dólar paralelo","Mercado paralelo",'<p class="big">Bs '+nf(pa.usd)+'</p>'+chip(pa.usd,pa.prevUsd)+'<div class="pr"><span>Brecha con el BCV</span><b>'+(pg>=0?"+":"")+pg.toLocaleString("es-VE",{maximumFractionDigits:1})+' %</b></div>',pa.at,"Actualizado");
+  tile("t-par","Dólar paralelo","Paralelo · Copiar",'<p class="big">Bs '+nf(pa.usd)+'</p>'+chip(pa.usd,pa.prevUsd)+'<div class="pr"><span>Brecha con el BCV</span><b>'+(pg>=0?"+":"")+pg.toLocaleString("es-VE",{maximumFractionDigits:1})+' %</b></div>',pa.at,"Actualizado",pa.usd);
   var lastTime = hhmm(new Date(Math.max(bn.at,ok.at,b.at,pa.at)));
-  $("stamp").textContent = offlineNote ? "Sin internet • Mostrando últimas tasas guardadas ("+lastTime+")." : "Última actualización a las "+lastTime+".";
+  $("stamp").textContent = offlineNote ? "Sin internet • Últimas tasas guardadas ("+lastTime+")" : "Actualizado a las "+lastTime;
   renderLog();
 }
 function renderLog(){
@@ -253,14 +306,16 @@ function convert(){
   var a=parseFloat($("amt").value)||0;
   var f=items.filter(function(i){return i.id===$("from").value})[0],t=items.filter(function(i){return i.id===$("to").value})[0];
   if(!f||!t)return;
-  $("result").innerHTML=nf(a*f.ves/t.ves)+" "+short(t.id)+"<small>1 "+short(f.id)+" = "+nf(f.ves/t.ves)+" "+short(t.id)+"</small>";
+  var val=a*f.ves/t.ves;
+  lastConvVal=nf(val);
+  $("result").innerHTML=lastConvVal+" "+short(t.id)+"<small>1 "+short(f.id)+" = "+nf(f.ves/t.ves)+" "+short(t.id)+"</small>";
 }
 function renderWorld(){
   var q=$("q").value.trim().toLowerCase(),box=$("world");
   var list=data.world.filter(function(w){return !q||(w.code+" "+w.name+" "+w.country).toLowerCase().indexOf(q)>-1});
   box.innerHTML=list.length?list.map(function(w){
-    return '<div class="row"><div>'+w.name+'<small>'+w.country+', '+w.code+'</small></div><div class="v">1 '+w.code+' = Bs '+nf(data.bcv.usd/w.perUsd)+'</div></div>';
-  }).join(""):'<p class="note">No hay resultados. Prueba con el código de la moneda, por ejemplo COP.</p>';
+    return '<div class="row"><div class="w-left"><span class="w-badge">'+w.code+'</span><div class="w-info"><div class="w-name">'+w.name+'</div><small>'+w.country+'</small></div></div><div class="v">Bs '+nf(data.bcv.usd/w.perUsd)+'</div></div>';
+  }).join(""):'<p class="note">No hay resultados. Prueba con el código, por ejemplo COP.</p>';
 }
 
 /* Calculadora */
@@ -275,156 +330,4 @@ function cfmt(s){
 function cshow(){$("cdisp").textContent=cfmt(cur);$("cexpr").textContent=ex}
 function calc(a,o,b){
   var r=o==="+"?a+b:o==="-"?a-b:o==="*"?a*b:b===0?NaN:a/b;
-  return isNaN(r)?null:parseFloat(r.toPrecision(12));
-}
-function press(k){
-  if(/^[0-9]$/.test(k)){if(fr){cur=k;fr=false}else if(cur.replace(/[-.]/g,"").length<12)cur=cur==="0"?k:cur+k}
-  else if(k==="."){if(fr){cur="0.";fr=false}else if(cur.indexOf(".")<0)cur+="."}
-  else if(SYM[k]){
-    if(op&&!fr){var r=calc(acc,op,parseFloat(cur));if(r===null){cur="0";ex="No se puede dividir entre 0";op=null;acc=null;fr=true;return cshow()}cur=String(r)}
-    acc=parseFloat(cur);op=k;fr=true;ex=cfmt(String(acc))+" "+SYM[k];
-  }
-  else if(k==="="){
-    if(op){var b=parseFloat(cur),r2=calc(acc,op,b);
-      if(r2===null){cur="0";ex="No se puede dividir entre 0"}else{ex=cfmt(String(acc))+" "+SYM[op]+" "+cfmt(String(b))+" =";cur=String(r2)}
-      op=null;acc=null;fr=true}
-  }
-  else if(k==="C"){cur="0";acc=null;op=null;fr=true;ex=""}
-  else if(k==="B"){if(!fr&&cur.length>1)cur=cur.slice(0,-1);else{cur="0";fr=true}if(cur==="-")cur="0"}
-  else if(k==="N"){if(cur!=="0")cur=cur[0]==="-"?cur.slice(1):"-"+cur}
-  else if(k==="%"){cur=String(parseFloat((parseFloat(cur)/100).toPrecision(12)));fr=true}
-  cshow();
-}
-var KEYS=[["C","C"],["⌫","B"],["%","%"],["÷","/"],["7","7"],["8","8"],["9","9"],["×","*"],["4","4"],["5","5"],["6","6"],["−","-"],["1","1"],["2","2"],["3","3"],["+","+"],["±","N"],["0","0"],[",","."],["=","="]];
-KEYS.forEach(function(k){
-  var b=document.createElement("button");b.type="button";b.textContent=k[0];
-  if("/*-+".indexOf(k[1])>-1||k[1]==="%")b.className="op";
-  if(k[1]==="=")b.className="eq";
-  b.addEventListener("click",function(){press(k[1])});
-  $("keys").appendChild(b);
-});
-[["Dólar BCV",function(){return data.bcv.usd}],["Dólar paralelo",function(){return data.paralelo.usd}],["Euro BCV",function(){return data.bcv.eur}],["USDT",function(){return usdtAvg()}]].forEach(function(q){
-  var b=document.createElement("button");b.type="button";b.textContent="Usar "+q[0];
-  b.addEventListener("click",function(){var v=q[1]();if(v==null)return;cur=String(parseFloat(v.toFixed(4)));fr=true;cshow()});
-  $("quick").appendChild(b);
-});
-
-var live=false;
-function dt(s,f){var d=s?new Date(s):null;return d&&!isNaN(d)?d:f}
-function track(k,v){
-  if(v==null)return null;
-  var s={};try{s=JSON.parse(localStorage.getItem("tv_"+k)||"{}")}catch(e){}
-  if(s.last!==undefined&&s.last!==v)s.prev=s.last;
-  s.last=v;try{localStorage.setItem("tv_"+k,JSON.stringify(s))}catch(e){}
-  return s.prev!==undefined?s.prev:v;
-}
-function addLog(src,val,prev,at,nodup){
-  if(val==null)return;
-  var last=log.filter(function(x){return x.src===src})[0];
-  if(last&&last.val===val&&(nodup||+last.at===+at))return;
-  log.unshift({at:at,src:src,val:val,delta:val-(prev==null?val:prev)});
-}
-function applyPayload(j,offlineNote){
-  var up=dt(j.updated,new Date()),bu=j.bcv&&j.bcv.usd,be=j.bcv&&j.bcv.eur,pa=j.paralelo;
-  if(!bu||!bu.value||!be||!be.value||!pa||!pa.value)throw new Error("faltan tasas");
-  var bd=dt(bu.at,up);
-  var nd={
-    bcv:{usd:bu.value,eur:be.value,prevUsd:track("usd",bu.value),prevEur:track("eur",be.value),at:up},
-    paralelo:{usd:pa.value,prevUsd:track("par",pa.value),at:dt(pa.at,up)},
-    binance:{buy:j.binance?j.binance.buy:null,sell:j.binance?j.binance.sell:null,at:up},
-    okx:{buy:j.okx?j.okx.buy:null,sell:j.okx?j.okx.sell:null,at:up},
-    world:data.world.map(function(w){var r=j.world&&j.world.rates&&j.world.rates[w.code];return {code:w.code,name:w.name,country:w.country,perUsd:r||w.perUsd}})
-  };
-  if(live||hasCached){["binance","okx"].forEach(function(k){if(avg(nd[k])===null&&avg(data[k])!==null)nd[k]=data[k]})}
-  nd.binance.prevAvg=track("bin",avg(nd.binance));
-  nd.okx.prevAvg=track("okx",avg(nd.okx));
-  var ds=bd.toLocaleDateString("es-VE",{day:"2-digit",month:"2-digit"});
-  addLog("Dólar BCV, tasa del "+ds,nd.bcv.usd,nd.bcv.prevUsd,up,true);
-  addLog("Euro BCV, tasa del "+ds,nd.bcv.eur,nd.bcv.prevEur,up,true);
-  addLog("Dólar paralelo",nd.paralelo.usd,nd.paralelo.prevUsd,nd.paralelo.at,true);
-  addLog("USDT OKX",avg(nd.okx),nd.okx.prevAvg,nd.okx.at,false);
-  addLog("USDT Binance",avg(nd.binance),nd.binance.prevAvg,nd.binance.at,false);
-  log.length=Math.min(log.length,20);
-  data=nd;build(offlineNote);
-}
-function loadCache(){
-  try{
-    var raw=localStorage.getItem("tv_cached_api");
-    if(!raw)return false;
-    applyPayload(JSON.parse(raw),true);
-    hasCached=true;
-    return true;
-  }catch(e){return false}
-}
-function loadReal(){
-  var btn=$("refresh");btn.disabled=true;
-  return fetch(API_URL).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).then(function(j){
-    try{localStorage.setItem("tv_cached_api",JSON.stringify(j))}catch(e){}
-    applyPayload(j,false);
-    live=true;hasCached=true;
-  }).catch(function(){
-    if(live||hasCached){renderRates(true)}
-    else{$("stamp").textContent="Sin conexión. Conéctate a internet una vez para descargar las tasas."}
-  }).then(function(){btn.disabled=false});
-}
-
-$("amt").addEventListener("input",convert);
-$("from").addEventListener("change",convert);
-$("to").addEventListener("change",convert);
-$("q").addEventListener("input",renderWorld);
-$("swap").addEventListener("click",function(){var a=$("from").value;$("from").value=$("to").value;$("to").value=a;convert()});
-$("refresh").addEventListener("click",function(){loadReal()});
-$("theme").addEventListener("click",function(){
-  var r=document.documentElement,c=r.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
-  r.dataset.theme=c==="dark"?"light":"dark";
-});
-window.addEventListener("online",function(){loadReal()});
-setInterval(function(){if(live||hasCached)renderRates(!live)},20000);
-
-data=makeSample();log=[];cshow();
-if(!loadCache()){build(false)}
-loadReal();
-setInterval(function(){loadReal()},60000);
-</script>
-</body>
-</html>
-""";
-
-    @SuppressLint("SetJavaScriptEnabled")
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        webView = new WebView(this);
-        webView.setLayoutParams(new ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        ));
-        setContentView(webView);
-
-        WebSettings s = webView.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setDatabaseEnabled(true);
-        s.setCacheMode(WebSettings.LOAD_DEFAULT);
-
-        webView.setBackgroundColor(0xFF0B1520);
-        webView.setWebChromeClient(new WebChromeClient());
-        webView.setWebViewClient(new WebViewClient());
-        webView.loadDataWithBaseURL(
-            "https://tasas-ve-api.rafael-f60.workers.dev/",
-            HTML,
-            "text/html",
-            "UTF-8",
-            null
-        );
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            super.onBackPressed();
-        }
-    }
-}
+  return isNaN(r)?null:parseFloat(r
