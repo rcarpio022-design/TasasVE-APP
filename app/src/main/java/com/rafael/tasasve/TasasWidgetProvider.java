@@ -3,6 +3,7 @@ package com.rafael.tasasve;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -28,10 +29,12 @@ import java.util.concurrent.Executors;
 import javax.net.ssl.HttpsURLConnection;
 
 public class TasasWidgetProvider extends AppWidgetProvider {
-    private static final String ACTION_REFRESH = "com.rafael.tasasve.ACTION_WIDGET_REFRESH";
+    public static final String ACTION_REFRESH = "com.rafael.tasasve.ACTION_WIDGET_REFRESH";
+    public static final String ACTION_SYNC_FROM_APP = "com.rafael.tasasve.ACTION_SYNC_FROM_APP";
+    public static final String PREFS = "tasas_widget_cache";
+
     private static final String HOST = "tasas-ve-api.rafael-f60.workers.dev";
     private static final String API_URL = "https://" + HOST + "/api";
-    private static final String PREFS = "tasas_widget_cache";
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
 
     @Override
@@ -46,18 +49,54 @@ public class TasasWidgetProvider extends AppWidgetProvider {
     @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
-        if (ACTION_REFRESH.equals(intent.getAction())) {
+        String action = intent.getAction();
+        AppWidgetManager mgr = AppWidgetManager.getInstance(context);
+        ComponentName cn = new ComponentName(context, TasasWidgetProvider.class);
+        int[] allIds = mgr.getAppWidgetIds(cn);
+
+        if (ACTION_SYNC_FROM_APP.equals(action)) {
+            for (int id : allIds) {
+                renderCachedIfAny(context, mgr, id, "App");
+            }
+            return;
+        }
+
+        if (ACTION_REFRESH.equals(action)) {
             int id = intent.getIntExtra(
                 AppWidgetManager.EXTRA_APPWIDGET_ID,
                 AppWidgetManager.INVALID_APPWIDGET_ID
             );
-            AppWidgetManager mgr = AppWidgetManager.getInstance(context);
             if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
                 bindActions(context, mgr, id);
                 renderCachedIfAny(context, mgr, id, "Actualizando…");
                 fetchAndRender(context, mgr, id);
+            } else {
+                for (int wId : allIds) {
+                    bindActions(context, mgr, wId);
+                    renderCachedIfAny(context, mgr, wId, "Actualizando…");
+                    fetchAndRender(context, mgr, wId);
+                }
             }
         }
+    }
+
+    public static void saveFromApp(Context context, double bcvUsd, double parUsd, Double usdtAvg) {
+        String bcvLine = "BCV: " + ((bcvUsd > 0) ? "Bs " + fmt(bcvUsd) : "Bs —");
+        String parVal = (parUsd > 0) ? "Bs " + fmt(parUsd) : "Bs —";
+        String usdtVal = (usdtAvg != null && usdtAvg > 0) ? "Bs " + fmt(usdtAvg) : "Bs —";
+        String parLine = "Par: " + parVal + " · USDT: " + usdtVal;
+        String hora = new SimpleDateFormat("hh:mm a", new Locale("es", "VE")).format(new Date());
+
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString("bcv", bcvLine)
+            .putString("par", parLine)
+            .putString("time", hora)
+            .apply();
+
+        Intent i = new Intent(context, TasasWidgetProvider.class);
+        i.setAction(ACTION_SYNC_FROM_APP);
+        context.sendBroadcast(i);
     }
 
     private void bindActions(Context context, AppWidgetManager mgr, int id) {
@@ -101,7 +140,7 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         if (bcv != null && par != null) {
             views.setTextViewText(R.id.w_bcv, bcv);
             views.setTextViewText(R.id.w_par, par);
-            views.setTextViewText(R.id.w_time, statusText + (lastTime != null ? " (" + lastTime + ")" : ""));
+            views.setTextViewText(R.id.w_time, (lastTime != null ? "Act. " + lastTime : statusText));
         } else {
             views.setTextViewText(R.id.w_time, statusText);
         }
@@ -120,14 +159,14 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         return sb.toString();
     }
 
-    private String resolveIpViaDoh() throws Exception {
+    private String resolveIpViaGoogleDoh() throws Exception {
         HttpsURLConnection doh = null;
         try {
-            URL u = new URL("https://1.1.1.1/dns-query?name=" + HOST + "&type=A");
+            URL u = new URL("https://dns.google/resolve?name=" + HOST + "&type=A");
             doh = (HttpsURLConnection) u.openConnection();
             doh.setConnectTimeout(10000);
             doh.setReadTimeout(10000);
-            doh.setRequestProperty("Accept", "application/dns-json");
+            doh.setRequestProperty("Accept", "application/json");
             if (doh.getResponseCode() != 200) throw new Exception("DoH HTTP " + doh.getResponseCode());
             JSONObject ans = new JSONObject(readStream(doh.getInputStream()));
             JSONArray arr = ans.optJSONArray("Answer");
@@ -176,7 +215,7 @@ public class TasasWidgetProvider extends AppWidgetProvider {
             InetAddress.getByName(HOST);
             return fetchJsonDirect(API_URL, null);
         } catch (UnknownHostException uhe) {
-            String ip = resolveIpViaDoh();
+            String ip = resolveIpViaGoogleDoh();
             return fetchJsonDirect("https://" + ip + "/api", HOST);
         }
     }
@@ -230,20 +269,12 @@ public class TasasWidgetProvider extends AppWidgetProvider {
                 String cachedPar = sp.getString("par", null);
                 String cachedTime = sp.getString("time", null);
 
-                String errMsg = e.getMessage();
-                if (errMsg == null || errMsg.trim().isEmpty()) {
-                    errMsg = e.getClass().getSimpleName();
-                }
-                if (errMsg.length() > 36) {
-                    errMsg = errMsg.substring(0, 36) + "…";
-                }
-
                 if (cachedBcv != null && cachedPar != null) {
                     views.setTextViewText(R.id.w_bcv, cachedBcv);
                     views.setTextViewText(R.id.w_par, cachedPar);
-                    views.setTextViewText(R.id.w_time, "Err: " + errMsg + (cachedTime != null ? " (" + cachedTime + ")" : ""));
+                    views.setTextViewText(R.id.w_time, "Guardado" + (cachedTime != null ? " · " + cachedTime : ""));
                 } else {
-                    views.setTextViewText(R.id.w_time, "Err: " + errMsg);
+                    views.setTextViewText(R.id.w_time, "Abre la app para cargar");
                 }
             }
 
