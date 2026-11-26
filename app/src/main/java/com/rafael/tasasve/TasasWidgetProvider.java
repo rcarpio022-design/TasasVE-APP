@@ -97,34 +97,56 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         mgr.updateAppWidget(id, views);
     }
 
+    private String fetchJsonOnce() throws Exception {
+        HttpsURLConnection conn = null;
+        try {
+            URL url = new URL(API_URL);
+            conn = (HttpsURLConnection) url.openConnection();
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", "TasasVE-Android/1.0");
+            conn.setRequestProperty("Accept", "application/json");
+
+            int code = conn.getResponseCode();
+            InputStream stream = (code >= 200 && code < 300) ? conn.getInputStream() : conn.getErrorStream();
+            StringBuilder sb = new StringBuilder();
+            if (stream != null) {
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(stream, "UTF-8"))) {
+                    String line;
+                    while ((line = br.readLine()) != null) sb.append(line);
+                }
+            }
+
+            if (code < 200 || code >= 300) {
+                throw new Exception("HTTP " + code);
+            }
+            return sb.toString();
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private String fetchJsonWithRetry() throws Exception {
+        try {
+            return fetchJsonOnce();
+        } catch (Exception firstError) {
+            try {
+                Thread.sleep(1500);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            return fetchJsonOnce();
+        }
+    }
+
     private void fetchAndRender(Context context, AppWidgetManager mgr, int id) {
         IO.execute(() -> {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
-            HttpsURLConnection conn = null;
             try {
-                URL url = new URL(API_URL);
-                conn = (HttpsURLConnection) url.openConnection();
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(15000);
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("User-Agent", "TasasVE-Android/1.0");
-                conn.setRequestProperty("Accept", "application/json");
+                String rawJson = fetchJsonWithRetry();
+                JSONObject root = new JSONObject(rawJson);
 
-                int code = conn.getResponseCode();
-                InputStream stream = (code >= 200 && code < 300) ? conn.getInputStream() : conn.getErrorStream();
-                StringBuilder sb = new StringBuilder();
-                if (stream != null) {
-                    try (BufferedReader br = new BufferedReader(new InputStreamReader(stream, "UTF-8"))) {
-                        String line;
-                        while ((line = br.readLine()) != null) sb.append(line);
-                    }
-                }
-
-                if (code < 200 || code >= 300) {
-                    throw new Exception("HTTP " + code);
-                }
-
-                JSONObject root = new JSONObject(sb.toString());
                 Double bcvUsd = extractNumber(root.optJSONObject("bcv"), "usd");
                 Double parUsd = extractNumber(root, "paralelo");
 
@@ -182,8 +204,6 @@ public class TasasWidgetProvider extends AppWidgetProvider {
                 } else {
                     views.setTextViewText(R.id.w_time, "Err: " + errMsg);
                 }
-            } finally {
-                if (conn != null) conn.disconnect();
             }
 
             bindActions(context, mgr, id);
