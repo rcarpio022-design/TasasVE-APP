@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_root"
-    android:layout_width="match_parent"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:background="#132130"
+    android:background="#14181F"
     android:orientation="vertical"
     android:padding="12dp">
 
@@ -19,47 +19,64 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Tasas VE"
-            android:textColor="#E8EEF5"
-            android:textSize="15sp"
+            android:textColor="#9AA4B2"
+            android:textSize="11sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_cfg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="8dp"
+            android:paddingEnd="6dp"
+            android:text="⚙"
+            android:textColor="#9AA4B2"
+            android:textSize="14sp" />
 
         <TextView
             android:id="@+id/w_refresh"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingStart="10dp"
-            android:paddingEnd="4dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="2dp"
             android:text="↻"
             android:textColor="#6FA3E6"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/w_bcv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="BCV: Bs —"
+            android:textColor="#F2B705"
             android:textSize="18sp"
             android:textStyle="bold" />
     </LinearLayout>
 
     <TextView
-        android:id="@+id/w_bcv"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="BCV: Bs —"
-        android:textColor="#6FA3E6"
-        android:textSize="16sp"
-        android:textStyle="bold" />
-
-    <TextView
         android:id="@+id/w_par"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="3dp"
         android:text="Par: Bs — · USDT: Bs —"
         android:textColor="#E8EEF5"
-        android:textSize="13sp" />
+        android:textSize="12sp" />
 
     <TextView
         android:id="@+id/w_time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="Toca ↻ para actualizar"
-        android:textColor="#93A4B8"
-        android:textSize="11sp" />
+        android:text="Toca ↻"
+        android:textColor="#7D8A9B"
+        android:textSize="10sp" />
 </LinearLayout>
