@@ -1,0 +1,122 @@
+package com.rafael.tasasve;
+
+import android.app.PendingIntent;
+import android.appwidget.AppWidgetManager;
+import android.appwidget.AppWidgetProvider;
+import android.content.Context;
+import android.content.Intent;
+import android.widget.RemoteViews;
+
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class TasasWidgetProvider extends AppWidgetProvider {
+    private static final String ACTION_REFRESH = "com.rafael.tasasve.ACTION_WIDGET_REFRESH";
+    private static final String API_URL = "https://tasas-ve-api.rafael-f60.workers.dev/api";
+    private static final ExecutorService IO = Executors.newSingleThreadExecutor();
+
+    @Override
+    public void onUpdate(Context context, AppWidgetManager mgr, int[] appWidgetIds) {
+        for (int id : appWidgetIds) {
+            bindActionsAndLoading(context, mgr, id);
+            fetchAndRender(context, mgr, id);
+        }
+    }
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        super.onReceive(context, intent);
+        if (ACTION_REFRESH.equals(intent.getAction())) {
+            int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
+            AppWidgetManager mgr = AppWidgetManager.getInstance(context);
+            if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                bindActionsAndLoading(context, mgr, id);
+                fetchAndRender(context, mgr, id);
+            }
+        }
+    }
+
+    private void bindActionsAndLoading(Context context, AppWidgetManager mgr, int id) {
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
+        views.setTextViewText(R.id.w_time, "Actualizando…");
+
+        Intent openIntent = new Intent(context, MainActivity.class);
+        PendingIntent openPi = PendingIntent.getActivity(
+            context, id, openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        views.setOnClickPendingIntent(R.id.w_root, openPi);
+
+        Intent refIntent = new Intent(context, TasasWidgetProvider.class);
+        refIntent.setAction(ACTION_REFRESH);
+        refIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+        PendingIntent refPi = PendingIntent.getBroadcast(
+            context, id + 1000, refIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        views.setOnClickPendingIntent(R.id.w_refresh, refPi);
+
+        mgr.updateAppWidget(id, views);
+    }
+
+    private void fetchAndRender(Context context, AppWidgetManager mgr, int id) {
+        IO.execute(() -> {
+            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
+            try {
+                HttpURLConnection conn = (HttpURLConnection) new URL(API_URL).openConnection();
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                conn.setRequestMethod("GET");
+
+                StringBuilder sb = new StringBuilder();
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                    String line;
+                    while ((line = br.readLine()) != null) sb.append(line);
+                }
+                conn.disconnect();
+
+                JSONObject root = new JSONObject(sb.toString());
+                double bcvUsd = root.getJSONObject("bcv").getJSONObject("usd").getDouble("value");
+                double parUsd = root.getJSONObject("paralelo").getDouble("value");
+
+                List<Double> p2p = new ArrayList<>();
+                for (String k : new String[]{"binance", "okx"}) {
+                    if (root.has(k) && !root.isNull(k)) {
+                        JSONObject ex = root.getJSONObject(k);
+                        if (ex.has("buy") && !ex.isNull("buy")) p2p.add(ex.getDouble("buy"));
+                        if (ex.has("sell") && !ex.isNull("sell")) p2p.add(ex.getDouble("sell"));
+                    }
+                }
+                String usdtStr = "—";
+                if (!p2p.isEmpty()) {
+                    double sum = 0;
+                    for (double v : p2p) sum += v;
+                    usdtStr = "Bs " + fmt(sum / p2p.size());
+                }
+
+                String hora = new SimpleDateFormat("hh:mm a", new Locale("es", "VE")).format(new Date());
+                views.setTextViewText(R.id.w_bcv, "BCV: Bs " + fmt(bcvUsd));
+                views.setTextViewText(R.id.w_par, "Par: Bs " + fmt(parUsd) + " · USDT: " + usdtStr);
+                views.setTextViewText(R.id.w_time, "Act. " + hora);
+            } catch (Exception e) {
+                views.setTextViewText(R.id.w_time, "Sin conexión al actualizar");
+            }
+            mgr.updateAppWidget(id, views);
+        });
+    }
+
+    private static String fmt(double val) {
+        return String.format(Locale.forLanguageTag("es-VE"), "%,.2f", val);
+    }
+}
