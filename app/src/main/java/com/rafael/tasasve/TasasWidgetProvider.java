@@ -38,7 +38,10 @@ public class TasasWidgetProvider extends AppWidgetProvider {
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
         if (ACTION_REFRESH.equals(intent.getAction())) {
-            int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
+            int id = intent.getIntExtra(
+                AppWidgetManager.EXTRA_APPWIDGET_ID,
+                AppWidgetManager.INVALID_APPWIDGET_ID
+            );
             AppWidgetManager mgr = AppWidgetManager.getInstance(context);
             if (id != AppWidgetManager.INVALID_APPWIDGET_ID) {
                 bindActionsAndLoading(context, mgr, id);
@@ -75,9 +78,15 @@ public class TasasWidgetProvider extends AppWidgetProvider {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
             try {
                 HttpURLConnection conn = (HttpURLConnection) new URL(API_URL).openConnection();
-                conn.setConnectTimeout(8000);
-                conn.setReadTimeout(8000);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
                 conn.setRequestMethod("GET");
+                conn.setRequestProperty("Accept", "application/json");
+
+                int code = conn.getResponseCode();
+                if (code < 200 || code >= 300) {
+                    throw new Exception("HTTP " + code);
+                }
 
                 StringBuilder sb = new StringBuilder();
                 try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
@@ -87,18 +96,21 @@ public class TasasWidgetProvider extends AppWidgetProvider {
                 conn.disconnect();
 
                 JSONObject root = new JSONObject(sb.toString());
-                double bcvUsd = root.getJSONObject("bcv").getJSONObject("usd").getDouble("value");
-                double parUsd = root.getJSONObject("paralelo").getDouble("value");
+                Double bcvUsd = extractNumber(root.optJSONObject("bcv"), "usd");
+                Double parUsd = extractNumber(root, "paralelo");
 
                 List<Double> p2p = new ArrayList<>();
                 for (String k : new String[]{"binance", "okx"}) {
-                    if (root.has(k) && !root.isNull(k)) {
-                        JSONObject ex = root.getJSONObject(k);
+                    JSONObject ex = root.optJSONObject(k);
+                    if (ex != null) {
                         if (ex.has("buy") && !ex.isNull("buy")) p2p.add(ex.getDouble("buy"));
                         if (ex.has("sell") && !ex.isNull("sell")) p2p.add(ex.getDouble("sell"));
                     }
                 }
-                String usdtStr = "—";
+
+                String bcvStr = (bcvUsd != null) ? "Bs " + fmt(bcvUsd) : "Bs —";
+                String parStr = (parUsd != null) ? "Bs " + fmt(parUsd) : "Bs —";
+                String usdtStr = "Bs —";
                 if (!p2p.isEmpty()) {
                     double sum = 0;
                     for (double v : p2p) sum += v;
@@ -106,8 +118,8 @@ public class TasasWidgetProvider extends AppWidgetProvider {
                 }
 
                 String hora = new SimpleDateFormat("hh:mm a", new Locale("es", "VE")).format(new Date());
-                views.setTextViewText(R.id.w_bcv, "BCV: Bs " + fmt(bcvUsd));
-                views.setTextViewText(R.id.w_par, "Par: Bs " + fmt(parUsd) + " · USDT: " + usdtStr);
+                views.setTextViewText(R.id.w_bcv, "BCV: " + bcvStr);
+                views.setTextViewText(R.id.w_par, "Par: " + parStr + " · USDT: " + usdtStr);
                 views.setTextViewText(R.id.w_time, "Act. " + hora);
             } catch (Exception e) {
                 views.setTextViewText(R.id.w_time, "Sin conexión al actualizar");
@@ -116,7 +128,23 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         });
     }
 
+    private static Double extractNumber(JSONObject parent, String key) {
+        if (parent == null || !parent.has(key) || parent.isNull(key)) return null;
+        Object val = parent.opt(key);
+        if (val instanceof Number) {
+            return ((Number) val).doubleValue();
+        }
+        if (val instanceof JSONObject) {
+            JSONObject obj = (JSONObject) val;
+            if (obj.has("value") && !obj.isNull("value")) {
+                return obj.optDouble("value", Double.NaN);
+            }
+        }
+        return null;
+    }
+
     private static String fmt(double val) {
+        if (Double.isNaN(val) || Double.isInfinite(val)) return "—";
         return String.format(Locale.forLanguageTag("es-VE"), "%,.2f", val);
     }
 }
