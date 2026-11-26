@@ -31,6 +31,7 @@ import javax.net.ssl.HttpsURLConnection;
 public class TasasWidgetProvider extends AppWidgetProvider {
     public static final String ACTION_REFRESH = "com.rafael.tasasve.ACTION_WIDGET_REFRESH";
     public static final String ACTION_SYNC_FROM_APP = "com.rafael.tasasve.ACTION_SYNC_FROM_APP";
+    public static final String EXTRA_OPEN_CONFIG = "extra_open_widget_config";
     public static final String PREFS = "tasas_widget_cache";
 
     private static final String HOST = "tasas-ve-api.rafael-f60.workers.dev";
@@ -80,23 +81,45 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    public static void saveFromApp(Context context, double bcvUsd, double parUsd, Double usdtAvg) {
-        String bcvLine = "BCV: " + ((bcvUsd > 0) ? "Bs " + fmt(bcvUsd) : "Bs —");
-        String parVal = (parUsd > 0) ? "Bs " + fmt(parUsd) : "Bs —";
-        String usdtVal = (usdtAvg != null && usdtAvg > 0) ? "Bs " + fmt(usdtAvg) : "Bs —";
-        String parLine = "Par: " + parVal + " · USDT: " + usdtVal;
+    public static void saveFromApp(
+        Context context,
+        double bcvUsd,
+        double bcvEur,
+        double parUsd,
+        Double usdtAvg,
+        Double binAvg,
+        Double okxAvg
+    ) {
         String hora = new SimpleDateFormat("hh:mm a", new Locale("es", "VE")).format(new Date());
+        SharedPreferences.Editor ed = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit();
+        ed.putFloat("v_bcv", (float) bcvUsd);
+        ed.putFloat("v_eur", (float) bcvEur);
+        ed.putFloat("v_par", (float) parUsd);
+        ed.putFloat("v_usdt", (usdtAvg != null && usdtAvg > 0) ? usdtAvg.floatValue() : -1f);
+        ed.putFloat("v_bin", (binAvg != null && binAvg > 0) ? binAvg.floatValue() : -1f);
+        ed.putFloat("v_okx", (okxAvg != null && okxAvg > 0) ? okxAvg.floatValue() : -1f);
+        ed.putString("time", hora);
+        ed.apply();
 
+        Intent i = new Intent(context, TasasWidgetProvider.class);
+        i.setAction(ACTION_SYNC_FROM_APP);
+        context.sendBroadcast(i);
+    }
+
+    public static void setWidgetMode(Context context, String mode) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putString("bcv", bcvLine)
-            .putString("par", parLine)
-            .putString("time", hora)
+            .putString("mode", mode)
             .apply();
 
         Intent i = new Intent(context, TasasWidgetProvider.class);
         i.setAction(ACTION_SYNC_FROM_APP);
         context.sendBroadcast(i);
+    }
+
+    public static String getWidgetMode(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString("mode", "all");
     }
 
     private void bindActions(Context context, AppWidgetManager mgr, int id) {
@@ -111,6 +134,7 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         views.setOnClickPendingIntent(R.id.w_root, openPi);
 
         Intent cfgIntent = new Intent(context, MainActivity.class);
+        cfgIntent.putExtra(EXTRA_OPEN_CONFIG, true);
         cfgIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent cfgPi = PendingIntent.getActivity(
             context, id + 2000, cfgIntent,
@@ -130,20 +154,71 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         mgr.updateAppWidget(id, views);
     }
 
-    private void renderCachedIfAny(Context context, AppWidgetManager mgr, int id, String statusText) {
+    private static void applyModeToViews(Context context, RemoteViews views, String fallbackTime) {
         SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String bcv = sp.getString("bcv", null);
-        String par = sp.getString("par", null);
+        float vBcv = sp.getFloat("v_bcv", -1f);
+        float vEur = sp.getFloat("v_eur", -1f);
+        float vPar = sp.getFloat("v_par", -1f);
+        float vUsdt = sp.getFloat("v_usdt", -1f);
+        float vBin = sp.getFloat("v_bin", -1f);
+        float vOkx = sp.getFloat("v_okx", -1f);
         String lastTime = sp.getString("time", null);
+        String mode = sp.getString("mode", "all");
 
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
-        if (bcv != null && par != null) {
-            views.setTextViewText(R.id.w_bcv, bcv);
-            views.setTextViewText(R.id.w_par, par);
-            views.setTextViewText(R.id.w_time, (lastTime != null ? "Act. " + lastTime : statusText));
-        } else {
-            views.setTextViewText(R.id.w_time, statusText);
+        String sBcv = (vBcv > 0) ? "Bs " + fmt(vBcv) : "Bs —";
+        String sEur = (vEur > 0) ? "Bs " + fmt(vEur) : "Bs —";
+        String sPar = (vPar > 0) ? "Bs " + fmt(vPar) : "Bs —";
+        String sUsdt = (vUsdt > 0) ? "Bs " + fmt(vUsdt) : "Bs —";
+        String sBin = (vBin > 0) ? "Bs " + fmt(vBin) : "Bs —";
+        String sOkx = (vOkx > 0) ? "Bs " + fmt(vOkx) : "Bs —";
+
+        String mainText;
+        String subText;
+
+        switch (mode) {
+            case "bcv":
+                mainText = "BCV: " + sBcv;
+                subText = "Euro: " + sEur + " · Par: " + sPar;
+                break;
+            case "eur":
+                mainText = "Euro: " + sEur;
+                subText = "BCV: " + sBcv + " · USDT: " + sUsdt;
+                break;
+            case "par":
+                mainText = "Par: " + sPar;
+                subText = "BCV: " + sBcv + " · USDT: " + sUsdt;
+                break;
+            case "usdt":
+                mainText = "USDT: " + sUsdt;
+                subText = "Bin: " + sBin + " · OKX: " + sOkx;
+                break;
+            case "bin":
+                mainText = "Binance: " + sBin;
+                subText = "OKX: " + sOkx + " · BCV: " + sBcv;
+                break;
+            case "okx":
+                mainText = "OKX: " + sOkx;
+                subText = "Bin: " + sBin + " · BCV: " + sBcv;
+                break;
+            case "all":
+            default:
+                mainText = "BCV: " + sBcv;
+                subText = "Par: " + sPar + " · USDT: " + sUsdt;
+                break;
         }
+
+        views.setTextViewText(R.id.w_bcv, mainText);
+        views.setTextViewText(R.id.w_par, subText);
+        if (lastTime != null) {
+            views.setTextViewText(R.id.w_time, "Act. " + lastTime);
+        } else {
+            views.setTextViewText(R.id.w_time, fallbackTime);
+        }
+    }
+
+    private void renderCachedIfAny(Context context, AppWidgetManager mgr, int id, String statusText) {
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
+        applyModeToViews(context, views, statusText);
         bindActions(context, mgr, id);
         mgr.updateAppWidget(id, views);
     }
@@ -220,6 +295,20 @@ public class TasasWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    private Double exchangeAvg(JSONObject root, String key) {
+        JSONObject ex = root.optJSONObject(key);
+        if (ex == null) return null;
+        List<Double> vals = new ArrayList<>();
+        Double buy = extractNumber(ex, "buy");
+        Double sell = extractNumber(ex, "sell");
+        if (buy != null && !Double.isNaN(buy)) vals.add(buy);
+        if (sell != null && !Double.isNaN(sell)) vals.add(sell);
+        if (vals.isEmpty()) return null;
+        double sum = 0;
+        for (double v : vals) sum += v;
+        return sum / vals.size();
+    }
+
     private void fetchAndRender(Context context, AppWidgetManager mgr, int id) {
         IO.execute(() -> {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_tasas);
@@ -227,55 +316,38 @@ public class TasasWidgetProvider extends AppWidgetProvider {
                 String rawJson = fetchJsonSmart();
                 JSONObject root = new JSONObject(rawJson);
 
-                Double bcvUsd = extractNumber(root.optJSONObject("bcv"), "usd");
+                JSONObject bcvObj = root.optJSONObject("bcv");
+                Double bcvUsd = extractNumber(bcvObj, "usd");
+                Double bcvEur = extractNumber(bcvObj, "eur");
                 Double parUsd = extractNumber(root, "paralelo");
+                Double binAvg = exchangeAvg(root, "binance");
+                Double okxAvg = exchangeAvg(root, "okx");
 
                 List<Double> p2p = new ArrayList<>();
-                for (String k : new String[]{"binance", "okx"}) {
-                    JSONObject ex = root.optJSONObject(k);
-                    if (ex != null) {
-                        Double buy = extractNumber(ex, "buy");
-                        Double sell = extractNumber(ex, "sell");
-                        if (buy != null && !Double.isNaN(buy)) p2p.add(buy);
-                        if (sell != null && !Double.isNaN(sell)) p2p.add(sell);
-                    }
-                }
+                if (binAvg != null && !Double.isNaN(binAvg)) p2p.add(binAvg);
+                if (okxAvg != null && !Double.isNaN(okxAvg)) p2p.add(okxAvg);
 
-                String bcvLine = "BCV: " + ((bcvUsd != null && !Double.isNaN(bcvUsd)) ? "Bs " + fmt(bcvUsd) : "Bs —");
-                String parVal = (parUsd != null && !Double.isNaN(parUsd)) ? "Bs " + fmt(parUsd) : "Bs —";
-                String usdtVal = "Bs —";
+                Double usdtAvg = null;
                 if (!p2p.isEmpty()) {
                     double sum = 0;
                     for (double v : p2p) sum += v;
-                    usdtVal = "Bs " + fmt(sum / p2p.size());
+                    usdtAvg = sum / p2p.size();
                 }
-                String parLine = "Par: " + parVal + " · USDT: " + usdtVal;
+
                 String hora = new SimpleDateFormat("hh:mm a", new Locale("es", "VE")).format(new Date());
-                String timeLine = "Act. " + hora;
+                SharedPreferences.Editor ed = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit();
+                if (bcvUsd != null && !Double.isNaN(bcvUsd)) ed.putFloat("v_bcv", bcvUsd.floatValue());
+                if (bcvEur != null && !Double.isNaN(bcvEur)) ed.putFloat("v_eur", bcvEur.floatValue());
+                if (parUsd != null && !Double.isNaN(parUsd)) ed.putFloat("v_par", parUsd.floatValue());
+                ed.putFloat("v_usdt", (usdtAvg != null && !Double.isNaN(usdtAvg)) ? usdtAvg.floatValue() : -1f);
+                ed.putFloat("v_bin", (binAvg != null && !Double.isNaN(binAvg)) ? binAvg.floatValue() : -1f);
+                ed.putFloat("v_okx", (okxAvg != null && !Double.isNaN(okxAvg)) ? okxAvg.floatValue() : -1f);
+                ed.putString("time", hora);
+                ed.apply();
 
-                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString("bcv", bcvLine)
-                    .putString("par", parLine)
-                    .putString("time", hora)
-                    .apply();
-
-                views.setTextViewText(R.id.w_bcv, bcvLine);
-                views.setTextViewText(R.id.w_par, parLine);
-                views.setTextViewText(R.id.w_time, timeLine);
+                applyModeToViews(context, views, "Act. " + hora);
             } catch (Exception e) {
-                SharedPreferences sp = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-                String cachedBcv = sp.getString("bcv", null);
-                String cachedPar = sp.getString("par", null);
-                String cachedTime = sp.getString("time", null);
-
-                if (cachedBcv != null && cachedPar != null) {
-                    views.setTextViewText(R.id.w_bcv, cachedBcv);
-                    views.setTextViewText(R.id.w_par, cachedPar);
-                    views.setTextViewText(R.id.w_time, "Guardado" + (cachedTime != null ? " · " + cachedTime : ""));
-                } else {
-                    views.setTextViewText(R.id.w_time, "Abre la app para cargar");
-                }
+                applyModeToViews(context, views, "Abre la app para cargar");
             }
 
             bindActions(context, mgr, id);
